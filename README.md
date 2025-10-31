@@ -12,7 +12,7 @@ This `console.tcl` file is the **core implementation** that provides the console
 
 **Important:** The full TIP 561 proposal includes additional wrapper code that delays initialization of this console until a user explicitly issues a console command (like `console show`). This ensures backward compatibility - Unix/Linux users who don't want the console will see no behavior change, with stdout/stderr continuing to go to the terminal as before.
 
-See the [TIP 561 document](link-to-tip) for the complete wrapper implementation that provides this lazy initialization behavior.
+See the [TIP 561 document](https://core.tcl-lang.org/tips/doc/trunk/tip/561.md)for the complete wrapper implementation that provides this lazy initialization behavior.
 
 ## Key Improvements in This Implementation
 
