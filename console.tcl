@@ -108,19 +108,19 @@ if {[package vcompare [package present Tcl] 8.6] >= 0} {
             return {initialize finalize write flush}
         }
         proc finalize {what x}          { }
-proc write {what x data}         { 
-    variable consoleInterp
-    # Check if interpreter still exists
-    if {[interp exists $consoleInterp]} {
-        set data [encoding convertfrom utf-8 $data]
-        set data [string map {\r ""} $data]
-        $consoleInterp eval [list ::tk::ConsoleOutput $what $data]
-    } else {
-        # Interpreter gone - pass data through to terminal
-        return -code error "console closed"
-    }
-    return ""
-}
+        proc write {what x data}         { 
+            variable consoleInterp
+            # Check if interpreter still exists
+            if {[interp exists $consoleInterp]} {
+                set data [encoding convertfrom utf-8 $data]
+                set data [string map {\r ""} $data]
+                $consoleInterp eval [list ::tk::ConsoleOutput $what $data]
+            } else {
+                # Interpreter gone - pass data through to terminal
+                return -code error "console closed"
+            }
+            return ""
+        }
         proc flush {what x}              { }
         namespace export {[a-z]*}
         namespace ensemble create -parameters what
@@ -130,23 +130,22 @@ proc write {what x data}         {
     chan push stdout {::tkConsoleOut stdout}
     chan push stderr {::tkConsoleOut stderr}
     
-    # Restore normal output if console widget goes away...
 # Restore normal output if console widget goes away...
-proc Oc_RestorePuts {slave} {
-    # Pop the transforms to restore normal output
-    catch {chan pop stdout}
-    catch {chan pop stderr}
-    
-    # Restore UTF-8 encoding for the terminal
-    catch {fconfigure stdout -encoding utf-8}
-    catch {fconfigure stderr -encoding utf-8}
-    
-    # Test that output is working - this should appear in terminal
-    catch {puts stderr "Console closed: output restored to terminal"}
-    
-    # Delete the console interpreter
-    catch {interp delete $slave}
-}
+    proc Oc_RestorePuts {slave} {
+        # Pop the transforms to restore normal output
+        catch {chan pop stdout}
+        catch {chan pop stderr}
+        
+        # Restore UTF-8 encoding for the terminal
+        catch {fconfigure stdout -encoding utf-8}
+        catch {fconfigure stderr -encoding utf-8}
+        
+        # Test that output is working - this should appear in terminal
+        catch {puts stderr "Console closed: output restored to terminal"}
+        
+        # Delete the console interpreter
+        catch {interp delete $slave}
+    }
 } else {    # 5b. Pre-8.6 needs to redefine 'puts' in order to redirect stdout
     #     and stderr messages to the console
     rename puts tcl_puts
@@ -209,26 +208,26 @@ proc Oc_RestorePuts {slave} {
     }]
     $consoleInterp alias puts puts
     # Restore normal [puts] if console widget goes away...
-proc Oc_RestorePuts {slave} {
-    # Pop the transforms first
-    catch {chan pop stdout}
-    catch {chan pop stderr}
-    
-    # Reconfigure for terminal
-    catch {fconfigure stdout -encoding utf-8 -buffering line}
-    catch {fconfigure stderr -encoding utf-8 -buffering none}
-    
-    # Flush any buffered data
-    catch {flush stdout}
-    catch {flush stderr}
-    
-    # Try writing WITHOUT catch to see any errors
-    puts stderr "\n=== Console closed: output restored ==="
-    flush stderr
-    
-    # Delete interpreter last
-    interp delete $slave
-}
+    proc Oc_RestorePuts {slave} {
+        # Pop the transforms first
+        catch {chan pop stdout}
+        catch {chan pop stderr}
+        
+        # Reconfigure for terminal
+        catch {fconfigure stdout -encoding utf-8 -buffering line}
+        catch {fconfigure stderr -encoding utf-8 -buffering none}
+        
+        # Flush any buffered data
+        catch {flush stdout}
+        catch {flush stderr}
+        
+        # Try writing WITHOUT catch to see any errors
+        puts stderr "\n=== Console closed: output restored ==="
+        flush stderr
+        
+        # Delete interpreter last
+        interp delete $slave
+    }
 }
 
 # 6. No matter what Tk_Main says, insist that this is an interactive  shell
