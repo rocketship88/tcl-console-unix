@@ -56,9 +56,23 @@ load "" Tk $consoleInterp
         }
         hide {
             $consoleInterp eval wm withdraw .
+            # Pop transforms when hiding
+            catch {chan pop stdout}
+            catch {chan pop stderr}
+            catch {fconfigure stdout -encoding utf-8}
+            catch {fconfigure stderr -encoding utf-8}
+            return "" ;# avoid output of 0
         }
         show {
             $consoleInterp eval wm deiconify .
+            # Re-push transforms when showing (if not already present)
+            if {[catch {chan push stdout {::tkConsoleOut stdout}}]} {
+                # Already pushed, that's fine
+            }
+            if {[catch {chan push stderr {::tkConsoleOut stderr}}]} {
+                # Already pushed, that's fine
+            }
+            return ""
         }
         eval {
             $consoleInterp eval \$optarg
@@ -68,7 +82,6 @@ load "" Tk $consoleInterp
         }
     }
 }]
-
 # 3. Alias a command 'consoleinterp' in the console window interpreter
 #       to cause evaluation of the command 'consoleinterp' in the
 #       application interpreter.
@@ -144,90 +157,10 @@ if {[package vcompare [package present Tcl] 8.6] >= 0} {
         catch {puts stderr "Console closed: output restored to terminal"}
         
         # Delete the console interpreter
-        catch {interp delete $slave}
+        #catch {interp delete $slave}
     }
-} else {    # 5b. Pre-8.6 needs to redefine 'puts' in order to redirect stdout
-    #     and stderr messages to the console
-    rename puts tcl_puts
-    ;proc puts {args} [subst -nocommands {
-        switch -exact -- [llength \$args] {
-            1 {
-                if {[string match -nonewline \$args]} {
-                    if {[catch {uplevel 1 [linsert \$args 0 tcl_puts]} msg]} {
-                        regsub -all tcl_puts \$msg puts msg
-                        return -code error \$msg
-                    }
-                } else {
-                    $consoleInterp eval [list ::tk::ConsoleOutput stdout \
-                            "[lindex \$args 0]\n"]
-                }
-            }
-            2 {
-                if {[string match -nonewline [lindex \$args 0]]} {
-                    $consoleInterp eval [list ::tk::ConsoleOutput stdout \
-                            [lindex \$args 1]]
-                } elseif {[string match stdout [lindex \$args 0]]} {
-                    $consoleInterp eval [list ::tk::ConsoleOutput stdout \
-                            "[lindex \$args 1]\n"]
-                } elseif {[string match stderr [lindex \$args 0]]} {
-                    $consoleInterp eval [list ::tk::ConsoleOutput stderr \
-                            "[lindex \$args 1]\n"]
-                } else {
-                    if {[catch {uplevel 1 [linsert \$args 0 tcl_puts]} msg]} {
-                        regsub -all tcl_puts \$msg puts msg
-                        return -code error \$msg
-                    }
-                }
-            }
-            3 {
-                if {![string match -nonewline [lindex \$args 0]]} {
-                    if {[catch {uplevel 1 [linsert \$args 0 tcl_puts]} msg]} {
-                        regsub -all tcl_puts \$msg puts msg
-                        return -code error \$msg
-                    }
-                } elseif {[string match stdout [lindex \$args 1]]} {
-                    $consoleInterp eval [list ::tk::ConsoleOutput stdout \
-                            [lindex \$args 2]]
-                } elseif {[string match stderr [lindex \$args 1]]} {
-                    $consoleInterp eval [list ::tk::ConsoleOutput stderr \
-                            [lindex \$args 2]]
-                } else {
-                    if {[catch {uplevel 1 [linsert \$args 0 tcl_puts]} msg]} {
-                        regsub -all tcl_puts \$msg puts msg
-                        return -code error \$msg
-                    }
-                }
-            }
-            default {
-                if {[catch {uplevel 1 [linsert \$args 0 tcl_puts]} msg]} {
-                    regsub -all tcl_puts \$msg puts msg
-                    return -code error \$msg
-                }
-            }
-        }
-    }]
-    $consoleInterp alias puts puts
-    # Restore normal [puts] if console widget goes away...
-    proc Oc_RestorePuts {slave} {
-        # Pop the transforms first
-        catch {chan pop stdout}
-        catch {chan pop stderr}
-        
-        # Reconfigure for terminal
-        catch {fconfigure stdout -encoding utf-8 -buffering line}
-        catch {fconfigure stderr -encoding utf-8 -buffering none}
-        
-        # Flush any buffered data
-        catch {flush stdout}
-        catch {flush stderr}
-        
-        # Try writing WITHOUT catch to see any errors
-        puts stderr "\n=== Console closed: output restored ==="
-        flush stderr
-        
-        # Delete interpreter last
-        interp delete $slave
-    }
+} else {    # 5b. Pre-8.6 no longer suppored, this is for at least 8.6 but really 9.1
+    return -code error "Console command requires Tcl 8.6 or later (channel transforms). Current version: [package present Tcl]"
 }
 
 # 6. No matter what Tk_Main says, insist that this is an interactive  shell
@@ -259,7 +192,7 @@ $consoleInterp eval {
     # Use WM_DELETE_WINDOW protocol to catch console close before destruction
     wm protocol . WM_DELETE_WINDOW {
         Oc_RestorePuts
-        destroy .
+        wm withdraw .
     }
 }
 
