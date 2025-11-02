@@ -120,12 +120,16 @@ if {[package vcompare [package present Tcl] 8.6] >= 0} {
             fconfigure $what -buffering none
             return {initialize finalize write flush}
         }
-        proc finalize {what x}          { }
-        proc write {what x data}         { 
+        proc finalize {what x}  { }
+        proc write {what x data}  { 
             variable consoleInterp
             # Check if interpreter still exists
             if {[interp exists $consoleInterp]} {
-                set data [encoding convertfrom utf-8 $data]
+                # Get the channel's actual encoding instead of hardcoding UTF-8
+                set enc [fconfigure $what -encoding]
+                if {$enc ne "binary"} {
+                    set data [encoding convertfrom $enc $data]
+                }
                 set data [string map {\r ""} $data]
                 $consoleInterp eval [list ::tk::ConsoleOutput $what $data]
             } else {
