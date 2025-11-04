@@ -148,21 +148,16 @@ if {[package vcompare [package present Tcl] 8.6] >= 0} {
     chan push stderr {::tkConsoleOut stderr}
     
 # Restore normal output if console widget goes away...
+    
     proc Oc_RestorePuts {slave} {
         # Pop the transforms to restore normal output
         catch {chan pop stdout}
         catch {chan pop stderr}
-        
-        # Restore UTF-8 encoding for the terminal
-        catch {fconfigure stdout -encoding utf-8}
-        catch {fconfigure stderr -encoding utf-8}
-        
-        # Test that output is working - this should appear in terminal
-        catch {puts stderr "Console closed: output restored to terminal"}
-        
-        # Delete the console interpreter
-        #catch {interp delete $slave}
-    }
+    
+        # Notify user
+        puts stderr "\n=== Console closed: output restored to terminal ==="
+        flush stderr
+   }
 } else {    # 5b. Pre-8.6 no longer suppored, this is for at least 8.6 but really 9.1
     return -code error "Console command requires Tcl 8.6 or later (channel transforms). Current version: [package present Tcl]"
 }
@@ -233,3 +228,4 @@ $consoleInterp eval {
 unset consoleInterp
 
 console title "[wm title .] Console"
+
