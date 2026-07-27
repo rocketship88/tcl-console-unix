@@ -17,7 +17,9 @@
 # If the Tcl command 'console' is already in the interpreter, our work
 # is done.
 ########################################################################
-if {![catch {console show}]} {
+if {[llength [info commands console]]} {
+    # console is already a native command on this platform (Windows/Mac) -
+    # do nothing and leave it alone.
     return
 }
  
