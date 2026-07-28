@@ -42,9 +42,17 @@ set consoleInterp [interp create]
 $consoleInterp eval [list set tk_library $tk_library]
 $consoleInterp alias exit exit
 load "" Tk $consoleInterp
+
+# Withdraw immediately, before anything else runs. Tk's initial map of a
+# new toplevel is a deferred idle-time task, not immediate - withdrawing
+# later (e.g. after sourcing console.tcl) can race against that pending
+# task and fail to prevent the window flashing visible. Withdrawing here,
+# before any event-loop activity has a chance to process that task, is
+# the reliable way to keep it hidden until "console show" is called.
+$consoleInterp eval {wm withdraw .}
  
 # 2. A command 'console' in the application interpreter
-;proc console {sub {optarg {}}} [subst -nocommands {
+;proc console {{sub ""} {optarg {}}} [subst -nocommands {
     switch -exact -- \$sub {
         title {
             $consoleInterp eval wm title . [list \$optarg]
@@ -52,20 +60,26 @@ load "" Tk $consoleInterp
         hide {
             $consoleInterp eval wm withdraw .
             # Pop transforms when hiding
-            catch {chan pop stdout}
-            catch {chan pop stderr}
-            catch {fconfigure stdout -encoding utf-8}
-            catch {fconfigure stderr -encoding utf-8}
+            if {\$::tkConsoleOut::pushed} {
+                catch {chan pop stdout}
+                catch {chan pop stderr}
+                catch {fconfigure stdout -encoding utf-8}
+                catch {fconfigure stderr -encoding utf-8}
+                set ::tkConsoleOut::pushed 0
+            }
             return "" ;# avoid output of 0
         }
         show {
             $consoleInterp eval wm deiconify .
-            # Re-push transforms when showing (if not already present)
-            if {[catch {chan push stdout {::tkConsoleOut stdout}}]} {
-                # Already pushed, that's fine
-            }
-            if {[catch {chan push stderr {::tkConsoleOut stderr}}]} {
-                # Already pushed, that's fine
+            # Only push transforms if not already active - chan push
+            # always succeeds even if already pushed, so pushing again
+            # here would stack a second transform layer, and a single
+            # chan pop on close would then leave one layer behind,
+            # silently redirecting output into the now-hidden console.
+            if {!\$::tkConsoleOut::pushed} {
+                chan push stdout {::tkConsoleOut stdout}
+                chan push stderr {::tkConsoleOut stderr}
+                set ::tkConsoleOut::pushed 1
             }
             return ""
         }
@@ -106,6 +120,7 @@ bind . <Destroy> [list +if {[string match . %W]} [list catch \
 #    transforms.
 namespace eval tkConsoleOut {
         variable consoleInterp $::consoleInterp
+        variable pushed 0
         proc initialize {what x mode}    {
             fconfigure $what -buffering none
             return {initialize finalize write flush}
@@ -133,15 +148,16 @@ namespace eval tkConsoleOut {
     namespace ensemble create -parameters what
 }
 
-# Leave encoding as default (utf-8)
-chan push stdout {::tkConsoleOut stdout}
-chan push stderr {::tkConsoleOut stderr}
+# Transforms are pushed lazily on first "console show" (see the console
+# proc above) rather than unconditionally here, so that loading the
+# module has no visible side effects until explicitly requested.
 
 # Restore normal output if console widget goes away...
 proc Oc_RestorePuts {slave} {
     # Pop the transforms to restore normal output
     catch {chan pop stdout}
     catch {chan pop stderr}
+    set ::tkConsoleOut::pushed 0
 
     # Notify user
     puts stderr "\n=== Console closed: output restored to terminal ==="
@@ -173,6 +189,11 @@ $consoleInterp eval {
         wm withdraw .
     }
 }
+
+# Start hidden regardless of console.tcl's own tcl_interactive check -
+# nothing should be visible or redirected until "console show" is
+# explicitly called.
+$consoleInterp eval {wm withdraw .}
 
 # addition by Schelte Bron ([sbron]):
 # Allow functional pasting with the middle mouse button
