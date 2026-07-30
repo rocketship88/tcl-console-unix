@@ -26,8 +26,8 @@ if {[llength [info commands console]]} {
 ########################################################################
 # Check Tcl/Tk support
 ########################################################################
-package require Tcl 9
-package require Tk 9
+package require Tcl 8.6-
+package require Tk 8.6-
 
 set _ [file join $tk_library console.tcl]
 if {![file readable $_]} {
