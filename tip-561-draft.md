@@ -133,28 +133,20 @@ and
 
 # A Note on `console eval` as a Semi-Public Interface
 
-Beyond simply opening a console window, `console eval` (and, from inside the
-console, `consoleinterp eval`/`record`) give a script direct access to the
+Beyond simply opening a console window, `console eval` gives a script direct access to the
 console's own widgets and to the main interpreter. This is already used in
 real, long-standing code - for example, colorized output via
 `::tk::ConsoleOutput` with custom tags (note: stdout and stderr are
-themselves implemented as text tags, with stderr set to a red foreground -
-custom tags used this way simply sit alongside them), or adding extra menu
+themselves implemented as text tags), or adding extra menu
 items and buttons to the console window itself (see
 [the Tcler's Wiki](https://wiki.tcl-lang.org/page/console) for examples in
 active use for close to 20 years).
 
 None of this is documented as a stable interface today. The manual page
 itself lists `tk::ConsoleOutput` under a section titled "Additional Trap
-Calls," with this exact warning:
+Calls"
 
-	These are documented here for completeness only; they form part
-	of the internal implementation of the console and are likely to
-	change or be modified without warning.
-
-Despite that warning, `tk::ConsoleOutput` has not changed in the roughly 20
-years this code has been in real, ongoing use - see the example above. As
-part of making `console` an officially supported command on Unix, it would
+As part of making `console` an officially supported command on Unix, it would
 be worth the core team also considering `tk::ConsoleOutput` and the small
 set of related internals it documents as a semi-public interface worth
 keeping stable going forward, given how much existing code already quietly
