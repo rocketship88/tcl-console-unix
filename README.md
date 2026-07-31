@@ -1,6 +1,6 @@
 # TIP 561: Console Command for Linux/Unix
 
-This repository contains the **working console.tcl implementation** for TIP 561, which proposes adding official support for the `console` command on Linux and other Unix platforms.
+This repository contains the **working console implementation** for TIP 561, which proposes adding official support for the `console` command on Linux and other Unix platforms.
 
 Note: the new TIP will use the files consolecmd.tcl and consolecmd.impl whereas an earlier version that was using a module and a stub are no longer being considered. Those files will remain for reference only.
 
