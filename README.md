@@ -2,15 +2,17 @@
 
 This repository contains the **working console.tcl implementation** for TIP 561, which proposes adding official support for the `console` command on Linux and other Unix platforms.
 
+Note: the new TIP will use the files consolecmd.tcl and consolecmd.impl whereas an earlier version that was using a module and a stub are no longer being considered. Those files will remain for reference only.
+
 ## Overview
 
 Currently, the console command works "out of the box" on Windows and macOS, but requires additional code on Linux/Unix. This TIP proposes making console support a standard feature across all Tk-enabled platforms.
 
 ## About This File
 
-This `console.tcl` file is the **core implementation** that provides the console functionality once activated. 
+This `consolecmd.impl` file is the **core implementation** that provides the console functionality once activated. 
 
-**Important:** The full TIP 561 proposal includes additional wrapper code that delays initialization of this console until a user explicitly issues a console command (like `console show`). This ensures backward compatibility - Unix/Linux users who don't want the console will see no behavior change, with stdout/stderr continuing to go to the terminal as before.
+**Important:** The full TIP 561 proposal delays initialization of this console until a user explicitly issues a console command (like `console show`). This ensures backward compatibility - Unix/Linux users who don't want the console will see no behavior change, with stdout/stderr continuing to go to the terminal as before.
 
 See the [TIP 561 document](https://core.tcl-lang.org/tips/doc/trunk/tip/561.md)for the complete wrapper implementation that provides this lazy initialization behavior.
 
@@ -46,38 +48,27 @@ When the console window is closed, output is now correctly restored to the termi
 
 - Uses `wm protocol . WM_DELETE_WINDOW` instead of `bind <Destroy>` to catch the close event early
 - Properly pops channel transforms and restores terminal encoding
-- Deletes the console interpreter cleanly
+- Insures that multiple console show commands only push/pop one transform
+- Restores stdin/stdout properly when console is closed or console hide is used.
 
 ### 3. Improved Keyboard Shortcuts
 
 Added platform-consistent font size controls:
 - `Control+=` (unshifted) in addition to `Control++`
 - Keypad `Control+KP_Add` and `Control+KP_Subtract`
+- Unix style middle click operation is supported but on Unix only
 
-These work automatically on Windows but require explicit bindings on Linux/X11.
-
-## Backward Compatibility
-
-The pre-8.6 `puts` wrapper implementation remains in the code for systems running Tcl versions prior to 8.6. The version check at line 99 automatically selects the appropriate method:
-
-```tcl
-if {[package vcompare [package present Tcl] 8.6] >= 0} {
-    # Use modern channel transforms (this implementation)
-} else {
-    # Fall back to puts wrapper for Tcl < 8.6
-}
-```
 
 ## Usage
 
 For testing purposes, you can source this file directly:
 
 ```tcl
-source console.tcl
+source consolecmd.impl
 console show
 ```
 
-In the final TIP 561 implementation, the wrapper code ensures the console is only initialized when explicitly requested by the user.
+In the final TIP 561 implementation, the wrapper code ensures the console is only initialized when explicitly requested by the user. In the tclIndex implementation, this is handled by that lazy loading implemenation, rather than new code to do the same thing.
 
 ## Benefits
 
