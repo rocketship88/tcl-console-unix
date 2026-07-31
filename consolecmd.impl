@@ -1,10 +1,10 @@
-# FILE: console.tcl
+# FILE: consolecmd.impl
 #
 #       Provides a console window.
 #
 # Last modified on: $Date: 2005-10-15 06:00:15 $
 # Last modified by: $Author: jcw $
-#
+# Updated by ET, 2026-07-30
 # This file is evaluated to provide a console window interface to the
 # root Tcl interpreter of an OOMMF application.  It calls on a script
 # included with the Tk script library to do most of the work, making use
