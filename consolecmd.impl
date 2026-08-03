@@ -58,11 +58,15 @@ load "" Tk $::tk::console::interp
 $::tk::console::interp eval {wm withdraw .}
  
 # 2. A command 'console' in the application interpreter
-proc console {{sub ""} {optarg {}}} {
+proc console {{sub ""} args} {
     upvar #0 ::tk::console::interp consoleInterp
     switch -exact -- $sub {
         title {
-            $consoleInterp eval wm title . [list $optarg]
+            if {[llength $args]} {
+                $consoleInterp eval wm title . [list [lindex $args 0]]
+            } else {
+                return [$consoleInterp eval wm title .]
+            }
         }
         hide {
             $consoleInterp eval wm withdraw .
@@ -91,7 +95,7 @@ proc console {{sub ""} {optarg {}}} {
             return ""
         }
         eval {
-            $consoleInterp eval $optarg
+            $consoleInterp eval [lindex $args 0]
         }
         default {
             error "bad option \"$sub\": should be hide, show, or title"
