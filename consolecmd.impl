@@ -1,10 +1,10 @@
-# FILE: consolecmd.impl
+# FILE: console.tcl
 #
 #       Provides a console window.
 #
 # Last modified on: $Date: 2005-10-15 06:00:15 $
 # Last modified by: $Author: jcw $
-# Updated by ET, 2026-07-30
+#
 # This file is evaluated to provide a console window interface to the
 # root Tcl interpreter of an OOMMF application.  It calls on a script
 # included with the Tk script library to do most of the work, making use
@@ -37,6 +37,19 @@ if {![file readable $_]} {
 ########################################################################
 # Provide the support which the Tk library script console.tcl assumes
 ########################################################################
+# ConsoleSetup and ConsoleSetupFinish (defined further below) together
+# do all of the following at most once, the first time any console
+# subcommand is actually invoked (see the "console" proc below) - not
+# unconditionally at file-load/source time. This keeps the file itself
+# inert when merely sourced or scanned (e.g. by auto_mkindex), the same
+# property Schelte's tip-561-autoload branch has by a similar design.
+proc ConsoleSetup {} {
+    if {[info exists ::tk::console::interp] \
+            && [interp exists $::tk::console::interp]} {
+        # Already set up - nothing to do.
+        return
+    }
+
 # 1. Create an interpreter for the console window widget and load Tk
 # Ensure the ::tk::console namespace exists before setting a variable
 # inside it - a bare "set" on a fully-qualified name requires every
@@ -45,7 +58,7 @@ if {![file readable $_]} {
 namespace eval ::tk::console {}
 
 set ::tk::console::interp [interp create]
-$::tk::console::interp eval [list set tk_library $tk_library]
+$::tk::console::interp eval [list set tk_library $::tk_library]
 $::tk::console::interp alias exit exit
 load "" Tk $::tk::console::interp
 
@@ -56,13 +69,22 @@ load "" Tk $::tk::console::interp
 # before any event-loop activity has a chance to process that task, is
 # the reliable way to keep it hidden until "console show" is called.
 $::tk::console::interp eval {wm withdraw .}
- 
+
+    ConsoleSetupFinish
+}
+
 # 2. A command 'console' in the application interpreter
 proc console {{sub ""} args} {
+    if {$sub ni {hide show title eval}} {
+        error "bad option \"$sub\": should be hide, show, title, or eval"
+    }
+    ConsoleSetup
     upvar #0 ::tk::console::interp consoleInterp
     switch -exact -- $sub {
         title {
-            if {[llength $args]} {
+            if {[llength $args] > 1} {
+                error "wrong # args: should be \"console title ?title?\""
+            } elseif {[llength $args]} {
                 $consoleInterp eval wm title . [list [lindex $args 0]]
             } else {
                 return [$consoleInterp eval wm title .]
@@ -95,10 +117,10 @@ proc console {{sub ""} args} {
             return ""
         }
         eval {
+            if {[llength $args] != 1} {
+                error "wrong # args: should be \"console eval script\""
+            }
             $consoleInterp eval [lindex $args 0]
-        }
-        default {
-            error "bad option \"$sub\": should be hide, show, or title"
         }
     }
 }
@@ -120,17 +142,9 @@ proc console {{sub ""} args} {
         }
     }
 }
-$::tk::console::interp alias consoleinterp consoleinterp
 
-# 4. Bind the <Destroy> event of the application interpreter's main
-#    window to kill the console (via tkConsoleExit)
-bind . <Destroy> [list +if {[string match . %W]} [list catch \
-        [list $::tk::console::interp eval tkConsoleExit]]]
-
-# 5. Redirect stdout/stderr messages to the console using TIP#230 channel
-#    transforms.
 namespace eval tkConsoleOut {
-        variable consoleInterp $::tk::console::interp
+        variable consoleInterp {}
         variable pushed 0
         proc initialize {what x mode}    {
             fconfigure $what -buffering none
@@ -139,6 +153,7 @@ namespace eval tkConsoleOut {
         proc finalize {what x}  { }
         proc write {what x data}  { 
             variable consoleInterp
+            set consoleInterp $::tk::console::interp
             # Check if interpreter still exists
             if {[interp exists $consoleInterp]} {
                 # Get the channel's actual encoding instead of hardcoding UTF-8
@@ -159,10 +174,6 @@ namespace eval tkConsoleOut {
     namespace ensemble create -parameters what
 }
 
-# Transforms are pushed lazily on first "console show" (see the console
-# proc above) rather than unconditionally here, so that loading the
-# module has no visible side effects until explicitly requested.
-
 # Restore normal output if console widget goes away...
 proc Oc_RestorePuts {slave} {
     # Pop the transforms to restore normal output
@@ -175,23 +186,37 @@ proc Oc_RestorePuts {slave} {
     flush stderr
 }
 
+# ConsoleSetupFinish - called once from ConsoleSetup above, once the
+# interp/Tk-load part is done. Split out so "console" (which needs
+# ConsoleSetup already defined) could stay near its original position -
+# Tcl only cares about call order between procs, not definition order,
+# so ConsoleSetup can call this even though it's defined later in the
+# file.
+proc ConsoleSetupFinish {} {
+$::tk::console::interp alias consoleinterp consoleinterp
+
+# 4. Bind the <Destroy> event of the application interpreter's main
+#    window to kill the console (via ::tk::ConsoleExit)
+bind . <Destroy> [list +if {[string match . %W]} [list catch \
+        [list $::tk::console::interp eval ::tk::ConsoleExit]]]
+
+# 5. Redirect stdout/stderr messages to the console using TIP#230 channel
+#    transforms.
+# (tkConsoleOut namespace/procs are defined once, unconditionally, below -
+#  see note after this proc. Only the interp/binding setup needs to be
+#  deferred; defining procs has no side effects worth guarding.)
+
+# Transforms are pushed lazily on first "console show" (see the console
+# proc above) rather than unconditionally here, so that loading the
+# module has no visible side effects until explicitly requested.
+
 # 6. No matter what Tk_Main says, insist that this is an interactive  shell
-set tcl_interactive 1
+set ::tcl_interactive 1
 
 ########################################################################
 # Evaluate the Tk library script console.tcl in the console interpreter
 ########################################################################
-$::tk::console::interp eval source [list [file join $tk_library console.tcl]]
-#$consoleInterp eval {
-#    if {![llength [info commands tkConsoleExit]]} {
-#        tk::unsupported::ExposePrivateCommand tkConsoleExit
-#    }
-#}
-#$consoleInterp eval {
-#    if {![llength [info commands tkConsoleOutput]]} {
-#        tk::unsupported::ExposePrivateCommand tkConsoleOutput
-#    }
-#}
+$::tk::console::interp eval source [list [file join $::tk_library console.tcl]]
 $::tk::console::interp alias Oc_RestorePuts Oc_RestorePuts $::tk::console::interp
 $::tk::console::interp eval {
     # Use WM_DELETE_WINDOW protocol to catch console close before destruction
@@ -243,5 +268,8 @@ $::tk::console::interp eval {
 # ::tk::console:: rather than left as a bare global, since it now has to
 # persist for the whole program instead of being unset right after setup.
 
-console title "[wm title .] Console"
+# Set the initial title directly (not via the public "console" command,
+# to avoid re-entering ConsoleSetup while it's still running).
+$::tk::console::interp eval [list wm title . "[wm title .] Console"]
+}
 
