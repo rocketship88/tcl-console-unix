@@ -2,7 +2,7 @@
 # the .ext extension results in invoking a 9.1b1 wish9.1 in my home directory
 # This takes quite a bit of magical setup, so I did not dare call it test.tcl
 
-# This file setups up 5 buttons, 2 for regular hide/show of the console
+# This file sets up 5 buttons, 2 for regular hide/show of the console
 # and 2 for the unpack/repack mechanism. It begins with the console created
 # but unpacked - so choose the show repack button to show it with some
 # colorized output, once it's visible, one can use the hide/show buttons
