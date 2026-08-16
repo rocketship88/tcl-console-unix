@@ -1,0 +1,261 @@
+# test.ext - testing a double click setup on ubuntu linux
+# the .ext extension results in invoking a 9.1b1 wish9.1 in my home directory
+# This takes quite a bit of magical setup, so I did not dare call it test.tcl
+
+# This file setups up 5 buttons, 2 for regular hide/show of the console
+# and 2 for the unpack/repack mechanism. It begins with the console created
+# but unpacked - so choose the show repack button to show it with some
+# colorized output, once it's visible, one can use the hide/show buttons
+# and use the puts button to see that text continues out to the console
+# when unpacked, but does not when using the regular hide
+# 
+# this file can also be run with a console aware wish from a terminal with
+# wish9.1 test.ext
+# then the output when the normal hide is use will revert back to the terminal
+#
+# don't inter mix the two kinds, and the close box is modified to use the unpack method
+
+# cputs - for color output to the console similar to how puts stderr outputs in red
+
+proc cputs {dest {string ""}} { ;# output colorized text and/or font changes to the console
+    if { ! [info exist ::tk::my_color_set] } { ;# a default set of colorful output texts
+        set ::tk::my_color_set 1
+        console eval {
+            .console tag configure green            -foreground \#00ff00 -background black -selectbackground grey50
+            .console tag configure yellowonblack    -foreground yellow -background black -font {ariel 14 bold}
+            .console tag configure yellow           -foreground yellow
+            .console tag configure whiteonred       -foreground white -background red
+            .console tag configure red              -foreground red
+        }
+    }
+    if { [string index $dest 0] eq "=" } { ;# dynamically add or change a tag, use with dest: {= tagname {attributes...}}
+    	lassign $dest eq name value
+    	console eval ".console tag configure $name $value" ;# add or modify the tag attributes
+        set dest $name	
+    }
+    # to just change the attributes, the string can be a "" which will not output anything, 
+    # since we don't add \n like puts does
+    console eval [list ::tk::ConsoleOutput $dest $string]
+}
+
+
+# These 2 unpack/repack can be used instead of console hide/show resp.
+# They amount to the same thing except the channel transforms are not
+# popped and so the console continues to receive and store puts output
+# In addition to these 2 proc's one should also change the meaning of
+# the window close box X which otherwise would do a console hide
+# these should not be intermixed with console show/hide or things can
+# get out of sync. You must do a console show to create the console
+# but you can immediately do an unpack
+#
+# todo: hide the globals geom and packorder in a namespace
+
+
+proc unpack {} {
+    if { [info exist ::packorder] } {
+    	return ;# already unpacked
+    }
+    if { [info commands console] eq "" } {
+        return ;# console command not available, nothing to unpack
+    }
+    
+    if {[catch {
+        set ::packorder [console eval {pack slaves .}]
+        foreach item $::packorder {
+            set ::packinfo($item) [console eval "pack info $item"]
+        }
+        console eval "
+            pack forget  $::packorder
+            wm withdraw .
+        "
+    } err_code]} {
+        puts $err_code
+    }
+    set ::geom [console eval {wm geom .}]
+}
+
+proc repack {} {
+    if {! [info exist ::packorder] } {
+    	return ;# can't repack, haven't done an unpack
+    } 
+    if {[catch {
+        foreach item $::packorder {
+            console eval "pack $item $::packinfo($item)"
+        }
+        console eval {wm deiconify .}
+    } err_code]} {
+        puts $err_code
+    }
+    catch {console eval "wm geom . $::geom"}
+    unset -nocomplain ::packorder ;# ready to be unpacked again
+}
+
+
+console show
+console eval {
+    # Use WM_DELETE_WINDOW protocol to catch console close and replace the hide with our unpack
+    wm protocol . WM_DELETE_WINDOW {
+       consoleinterp eval unpack
+    }
+}
+unpack ;# begin unpacked but will still capture data
+
+
+
+labelframe .frame -text buttons
+pack .frame
+button  .conoff    -text "console hide" -command {console hide} ;# {console eval {wm withdraw . }; set geom [console eval {wm geom .}]} 
+button  .conon     -text "console show" -command {console show} ;# {console eval  {wm deiconify .}; catch {console eval "wm geom . $::geom"}}
+button  .conunpack     -text "console hide / unpack" -command {unpack}
+button  .conrepack     -text "console show / repack" -command {repack}
+button  .put       -text "puts" -command {puts "hello [incr ::count]"} 
+pack  .conoff  .conon   .put .conunpack .conrepack   -in .frame     
+
+puts "double-click test"
+puts stderr "stderr test"
+puts "isatty stdout: [fconfigure stdout -blocking]"
+puts "info nameofexecutable: [info nameofexecutable]"
+
+
+
+proc box {title args} {
+	cputs green "                                $title\n"
+	cputs green "  "
+	cputs stdout "\n"
+	foreach item $args {
+		cputs green "  "
+		if { [string index $item 0] eq "!" } {
+			cputs stderr " [string range $item 1 end]\n"	
+		} else {
+			cputs stdout " $item\n"		
+		}
+	}
+	cputs green "  "
+	cputs stdout "\n"
+	cputs green "\n"
+}
+
+box  "some tests"  "double-click test" \
+                    "!stderr test" \
+                    "isatty stdout: [fconfigure stdout -blocking]" \
+                    "info nameofexecutable: [info nameofexecutable]"
+
+
+set ::geom 102x17+514+24
+
+
+
+
+
+
+#load these two inisde the console, to see the console's own Tk setup
+#need to use console eval {ltree .} for example. Note that inside the
+#console a puts ends up outside since channel transforms are process wide
+#not just interpreter only
+
+console eval {
+proc lw {widget} {	  # list a widget
+	set w [$widget configure]
+	foreach item $w {
+		set opt [lindex $item 0]
+		set val "---"
+		catch {set val [$widget cget $opt]}
+		set wid($opt) $val 
+    }	
+	set names [lsort -dictionary [array names wid]]
+	set n [llength $names]
+	set n2 [expr ( $n/2 )]
+	set odd [expr ( $n % 2 )]
+	if { $odd } {
+		incr n2  ;# so this one is 1 more than half
+	}
+	if { $odd } {
+		for {set m 0;set m2 [expr ( $m+$n2 )]} {$m < $n2} {incr m;incr m2} {
+			
+			if { $m == $n2-1 } {
+				set left [lindex $names $m]
+				set leftt [format {%-20s %-20s} $left $wid($left)]
+				puts "$leftt|"
+			
+			} else {
+				set left [lindex $names $m]
+				set right [lindex $names $m2]
+				set leftt [format {%-20s %-20s} $left $wid($left)]
+				if { [string length $leftt] > 41 } {
+					set leftt [format {%s %s} $left $wid($left)]
+					set leftt [string range [format %-41s $leftt] 0 40]
+				}
+				set rightt [format {%-20s %-20s} $right $wid($right)]
+				puts "$leftt|[string trimright $rightt]"
+			}
+		}
+
+	} else {
+		for {set m 0;set m2 [expr ( $m+$n2 )]} {$m < $n2} {incr m;incr m2} {
+				set left [lindex $names $m]
+				set right [lindex $names $m2]
+				set leftt [format {%-20s %-20s} $left $wid($left)]
+				if { [string length $leftt] > 41 } {
+					set leftt [format {%s %s} $left $wid($left)]
+					set leftt [string range [format %-41s $leftt] 0 40]
+				}
+				set rightt [format {%-20s %-20s} $right $wid($right)]
+				puts "$leftt|[string trimright $rightt]"
+		}
+		
+	}
+}
+#---------------------
+proc ltree {{root .} {level 0}} {					# list widget tree
+	set children [winfo children $root]
+	set class [winfo class $root]
+	set info ""
+	if       { $class == "Button" } {
+		set info [split [$root cget -text] \n]
+	
+	} elseif { $class == "TLabelframe" } {
+		set info [split [$root cget -text] \n]
+	
+	} elseif { $class == "TButton" } {
+		set info [split [$root cget -text] \n]
+	
+	} elseif { $class == "TEntry" } {
+		set info "var: [$root cget -textvariable]"
+	} elseif { $class == "TCheckbutton" } {
+		set info [split [$root cget -text] \n]
+	} elseif { $class == "TButton2" } {
+		set info [split [$root cget -text] \n]
+	} else {
+	
+	}
+
+	# Determine actual pack containment, which can differ from the
+	# Tk widget-hierarchy parent when a widget is packed via -in
+	# into a container that isn't its real winfo parent.
+	set packnote ""
+	if {[winfo manager $root] eq "pack"} {
+		set pinfo [pack info $root]
+		set idx [lsearch $pinfo "-in"]
+		if {$idx >= 0} {
+			set packparent [lindex $pinfo [expr {$idx + 1}]]
+			set realparent [winfo parent $root]
+			if {$packparent ne $realparent} {
+				set packnote "  (packed -in $packparent)"
+			}
+		}
+	}
+
+	puts -nonewline "[string repeat " |  " $level]"
+	puts -nonewline "$root"
+	puts -nonewline " - $class  $info$packnote\n"
+	if { $children == "" } {
+		return $root
+	} else {
+		foreach child $children {
+			set tout [ltree $child [expr ( $level + 1 )]]
+		}
+		
+	}	
+}
+
+}
