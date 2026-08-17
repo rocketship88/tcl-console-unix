@@ -150,8 +150,8 @@ set ::geom 102x17+514+24
 
 #load these two inisde the console, to see the console's own Tk setup
 #need to use console eval {ltree .} for example. Note that inside the
-#console a puts ends up outside since channel transforms are process wide
-#not just interpreter only
+#console a puts ends up outside since channel transforms are channel wide
+#not just interpreter only, and new interps get std in/out/err shared automatically
 
 console eval {
 proc lw {widget} {	  # list a widget
