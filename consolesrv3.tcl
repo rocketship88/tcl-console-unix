@@ -1,6 +1,6 @@
 # consolesrv3.tcl - console-dump server, WITH tag info (port 9996)
 #
-# Same idea as consolesrv2.tcl, but normalizes each dump element
+# Same idea as earlier try, but normalizes each dump element
 # through [list] before sending, so every element gets Tcl's own
 # consistent, safe quoting - avoiding the mixed brace/backslash
 # quoting styles that [.console dump] itself produces, which don't
