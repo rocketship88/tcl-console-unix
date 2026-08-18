@@ -55,45 +55,71 @@ proc cputs {dest {string ""}} { ;# output colorized text and/or font changes to 
 # todo: hide the globals geom and packorder in a namespace
 
 
+namespace eval ::tk::unpack {
+    variable packorder
+    variable packinfo
+    variable geom
+    variable menuwas
+    array set packinfo {}
+}
+
 proc unpack {} {
-    if { [info exist ::packorder] } {
-    	return ;# already unpacked
+    variable ::tk::unpack::packorder
+    variable ::tk::unpack::packinfo
+    variable ::tk::unpack::geom
+    variable ::tk::unpack::menuwas
+
+    if { [info exist packorder] } {
+        return ;# already unpacked
     }
     if { [info commands console] eq "" } {
         return ;# console command not available, nothing to unpack
     }
-    
+    if { [catch {console eval {winfo exists .console}} exists] || !$exists } {
+        return ;# console not yet initialized, nothing to unpack
+    }
+
     if {[catch {
-        set ::packorder [console eval {pack slaves .}]
-        foreach item $::packorder {
-            set ::packinfo($item) [console eval "pack info $item"]
+        set packorder [console eval {pack slaves .}]
+        foreach item $packorder {
+            set packinfo($item) [console eval "pack info $item"]
         }
+        set menuwas [console eval {. cget -menu}]
+        console eval {. configure -menu {}}
+
         console eval "
-            pack forget  $::packorder
+            pack forget  $packorder
             wm withdraw .
         "
     } err_code]} {
         puts $err_code
     }
-    set ::geom [console eval {wm geom .}]
+    set geom [console eval {wm geom .}]
 }
 
 proc repack {} {
-    if {! [info exist ::packorder] } {
-    	return ;# can't repack, haven't done an unpack
-    } 
+    variable ::tk::unpack::packorder
+    variable ::tk::unpack::packinfo
+    variable ::tk::unpack::geom
+    variable ::tk::unpack::menuwas
+
+    if {! [info exist packorder] } {
+        return ;# can't repack, haven't done an unpack
+    }
     if {[catch {
-        foreach item $::packorder {
-            console eval "pack $item $::packinfo($item)"
+        foreach item $packorder {
+            console eval "pack $item $packinfo($item)"
+        }
+        if { [info exist menuwas] && $menuwas ne "" } {
+            console eval [list . configure -menu $menuwas]
         }
         console eval {wm deiconify .}
     } err_code]} {
         puts $err_code
     }
-    catch {console eval "wm geom . $::geom"}
-    unset -nocomplain ::packorder ;# ready to be unpacked again
+    catch {console eval "wm geom . $geom"}
+    unset -nocomplain packorder menuwas
 }
-
 
 console show
 console eval {
@@ -147,7 +173,7 @@ box  "some tests"  "double-click test" \
                     "info nameofexecutable: [info nameofexecutable]"
 
 
-set ::geom 102x17+514+24
+set ::tk::unpack::geom 102x17+514+24
 
 
 
