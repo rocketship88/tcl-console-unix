@@ -2,12 +2,15 @@
 # the .ext extension results in invoking a 9.1b1 wish9.1 in my home directory
 # This takes quite a bit of magical setup, so I did not dare call it test.tcl
 
-# This file sets up 5 buttons, 2 for regular hide/show of the console
-# and 2 for the unpack/repack mechanism. It begins with the console created
-# but unpacked - so choose the show repack button to show it with some
+# This file setups up 7 buttons, 2 for regular hide/show of the console
+# 2 for the unpack/repack mechanismm and 2 for simple withdraw/deiconify. 
+# It begins with the console created but unpacked - the labelframe shows last command
+# used, so choose the show repack button to show it with some
 # colorized output, once it's visible, one can use the hide/show buttons
 # and use the puts button to see that text continues out to the console
 # when unpacked, but does not when using the regular hide
+# When clicking the minimize button, the window manager adds the window to its
+# list of windows for the program, while unpack or withdraw internally are stealthy
 # 
 # this file can also be run with a console aware wish from a terminal with
 # wish9.1 test.ext
@@ -102,14 +105,16 @@ unpack ;# begin unpacked but will still capture data
 
 
 
-labelframe .frame -text buttons
+labelframe .frame -text "unpacked"
 pack .frame
-button  .conoff    -text "console hide" -command {console hide} ;# {console eval {wm withdraw . }; set geom [console eval {wm geom .}]} 
-button  .conon     -text "console show" -command {console show} ;# {console eval  {wm deiconify .}; catch {console eval "wm geom . $::geom"}}
-button  .conunpack     -text "console hide / unpack" -command {unpack}
-button  .conrepack     -text "console show / repack" -command {repack}
+button  .conoff    -text "console hide" -command {console hide;.frame config -text "hidden"} ;# {console eval {wm withdraw . }; set geom [console eval {wm geom .}]} 
+button  .conon     -text "console show" -command {console show;.frame config -text "shown"} ;# {console eval  {wm deiconify .}; catch {console eval "wm geom . $::geom"}}
+button  .conunpack     -text "console hide / unpack" -command {unpack;.frame config -text "unpacked"}
+button  .conrepack     -text "console show / repack" -command {repack;.frame config -text "packed"}
+button  .conwithdraw    -text "console hide / withdraw" -command {console eval {wm withdraw .};.frame config -text "withdrawn"}
+button  .condeiconify    -text "console show / deiconify" -command {console eval {wm deiconify .};.frame config -text "deiconfied"}
 button  .put       -text "puts" -command {puts "hello [incr ::count]"} 
-pack  .conoff  .conon   .put .conunpack .conrepack   -in .frame     
+pack  .conoff  .conon   .put .conunpack .conrepack .conwithdraw .condeiconify -in .frame     
 
 puts "double-click test"
 puts stderr "stderr test"
