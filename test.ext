@@ -5,10 +5,11 @@
 # This file setups up 7 buttons, 2 for regular hide/show of the console
 # 2 for the unpack/repack mechanismm and 2 for simple withdraw/deiconify. 
 # It begins with the console created but unpacked - the labelframe shows last command
-# used, so choose the show repack button to show it with some
-# colorized output, once it's visible, one can use the hide/show buttons
+# used, so first choose the show repack button to show it with some
+# colorized output. Once it's visible, one can use the hide/show buttons
 # and use the puts button to see that text continues out to the console
 # when unpacked, but does not when using the regular hide
+#
 # When clicking the minimize button, the window manager adds the window to its
 # list of windows for the program, while unpack or withdraw internally are stealthy
 # 
