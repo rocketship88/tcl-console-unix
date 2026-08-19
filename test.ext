@@ -27,7 +27,7 @@ proc cputs {dest {string ""}} { ;# output colorized text and/or font changes to 
         console eval {
             .console tag configure green            -foreground \#00ff00 -background black -selectbackground grey50
             .console tag configure yellowonblack    -foreground yellow -background black -font {ariel 14 bold}
-            .console tag configure yellow           -foreground yellow
+            .console tag configure yellow           -foreground yellow -background grey50
             .console tag configure whiteonred       -foreground white -background red
             .console tag configure red              -foreground red
         }
@@ -149,25 +149,26 @@ puts "isatty stdout: [fconfigure stdout -blocking]"
 puts "info nameofexecutable: [info nameofexecutable]"
 
 
-
+cputs {= grey {-background \#005f00}}
+cputs {= yellow {-foreground gold -background \#005f00 -font {{consolas bold} 15} -tabs {7c left} }}
 proc box {title args} {
-	cputs green "                                $title\n"
-	cputs green "  "
+	cputs yellow "\t$title\n"
+	cputs grey "  "
 	cputs stdout "\n"
 	foreach item $args {
-		cputs green "  "
+		cputs grey "  "
 		if { [string index $item 0] eq "!" } {
 			cputs stderr " [string range $item 1 end]\n"	
 		} else {
 			cputs stdout " $item\n"		
 		}
 	}
-	cputs green "  "
+	cputs grey "  "
 	cputs stdout "\n"
-	cputs green "\n"
+	cputs grey "\n"
 }
 
-box  "some tests"  "double-click test" \
+box  "Some Box Tests"  "double-click test" \
                     "!stderr test" \
                     "isatty stdout: [fconfigure stdout -blocking]" \
                     "info nameofexecutable: [info nameofexecutable]"
