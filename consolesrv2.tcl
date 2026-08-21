@@ -27,8 +27,14 @@
 namespace eval ::consolesrv2 {
     variable listener
     variable conns
+    variable buffers
+    variable timeoutid
     array set conns {}
+    array set buffers {}
+    array set timeoutid {}
 }
+
+proc ::consolesrv2::PasteTimeoutMs {} { return 2000 }
 
 proc ::consolesrv2::Accept {chan addr port} {
     variable conns
@@ -41,8 +47,11 @@ proc ::consolesrv2::Accept {chan addr port} {
 
 proc ::consolesrv2::HandleLine {chan} {
     variable conns
+    variable buffers
+    variable timeoutid
 
     if {[eof $chan]} {
+        ::consolesrv2::CancelTimeout $chan
         ::consolesrv2::CloseConn $chan
         return
     }
@@ -53,21 +62,48 @@ proc ::consolesrv2::HandleLine {chan} {
         return
     }
 
-    set line [string trim $line]
+    # a line arrived - cancel any pending paste-timeout, we'll
+    # re-arm one below only if we're still incomplete after this
+    ::consolesrv2::CancelTimeout $chan
 
-    if {$line eq "done"} {
+    # accumulate this line onto whatever's already buffered for
+    # this connection (handles multi-line pastes, e.g. a proc body)
+    if {[info exists buffers($chan)]} {
+        append buffers($chan) "\n" $line
+    } else {
+        set buffers($chan) $line
+    }
+
+    set trimmed [string trim $buffers($chan)]
+
+    if {$trimmed eq "done"} {
         catch {puts $chan "closing"}
         catch {flush $chan}
+        unset -nocomplain buffers($chan)
         ::consolesrv2::CloseConn $chan
         return
     }
 
-    if {$line eq ""} {
-        # ignore blank lines rather than eval-ing nothing
+    if {$trimmed eq ""} {
+        # blank line(s) only - reset and wait for real input
+        unset -nocomplain buffers($chan)
         return
     }
 
-    if {[catch {uplevel #0 $line} result]} {
+    if {![info complete $buffers($chan)]} {
+        # not a complete command yet (e.g. mid-proc-body) - keep
+        # buffering, but arm a timeout in case the rest never
+        # arrives (e.g. someone typed an unclosed brace manually
+        # rather than pasting a complete block)
+        set timeoutid($chan) [after [::consolesrv2::PasteTimeoutMs] \
+            [list ::consolesrv2::PasteTimeout $chan]]
+        return
+    }
+
+    set cmd $buffers($chan)
+    unset -nocomplain buffers($chan)
+
+    if {[catch {uplevel #0 $cmd} result]} {
         catch {puts $chan "ERROR: $result"}
     } else {
         catch {puts $chan $result}
@@ -75,14 +111,38 @@ proc ::consolesrv2::HandleLine {chan} {
     catch {flush $chan}
 }
 
+proc ::consolesrv2::CancelTimeout {chan} {
+    variable timeoutid
+    if {[info exists timeoutid($chan)]} {
+        catch {after cancel $timeoutid($chan)}
+        unset -nocomplain timeoutid($chan)
+    }
+}
+
+proc ::consolesrv2::PasteTimeout {chan} {
+    variable buffers
+    variable timeoutid
+    unset -nocomplain timeoutid($chan)
+    if {[info exists buffers($chan)]} {
+        catch {
+            puts $chan "ERROR: incomplete command, timed out waiting for more input (paste it as one block)"
+            flush $chan
+        }
+        unset -nocomplain buffers($chan)
+    }
+}
+
 proc ::consolesrv2::CloseConn {chan} {
     variable conns
+    variable buffers
     if {[info exists conns($chan)]} {
         puts stderr "consolesrv2: disconnect [lindex $conns($chan) 0]:[lindex $conns($chan) 1] ($chan)"
     }
+    ::consolesrv2::CancelTimeout $chan
     catch {fileevent $chan readable {}}
     catch {close $chan}
     unset -nocomplain conns($chan)
+    unset -nocomplain buffers($chan)
 }
 
 proc ::consolesrv2::Start {{port 9997}} {
