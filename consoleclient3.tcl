@@ -5,10 +5,60 @@
 # so .console exists locally):
 #   source consoleclient3.tcl
 #   fetch3 <ip> 9996
-#------------------------------------
+#
+# Also provides sendproc, a workaround for tkcon's socket-attach
+# mode mangling backslashes (tkcon's EvalSocket runs every command
+# through [subst -novariables -nocommands] before sending, which
+# corrupts things like \d, \d+, or a literal \\ in pasted code -
+# see consolesrv2.tcl's header for details). To use: paste/type the
+# proc you want to send into THIS console (the local one, not via
+# tkcon), then call:
+#   sendproc <procname> <ip> [port 9997]
+# This reconstructs the proc's real definition locally via [info
+# args]/[info body]/[info default] and sends it as one single,
+# untouched write to consolesrv2's eval socket - no subst involved
+# anywhere in this path, so backslashes arrive exactly as typed.
+
+proc reconstruct {proc_name} {
+    set proc_name [uplevel 1 [list namespace which -command $proc_name]]
+    set params [lmap param_name [info args $proc_name] {
+        if {[info default $proc_name $param_name defval]} {
+            list $param_name $defval
+        } else {
+            list $param_name
+        }
+    }]
+    return [list proc $proc_name $params [info body $proc_name]]
+}
+
+proc sendproc {procname {ip ""} {port 9997}} {
+    global ipvar
+    if { $ip eq "" } {
+    	catch {set ip $ipvar}
+    }
+    if {[catch {uplevel 1 [list reconstruct $procname]} fulltext]} {
+        puts "sendproc: no such proc \"$procname\" defined locally"
+        return
+    }
+
+    set sock [socket $ip $port]
+    fconfigure $sock -translation binary -encoding utf-8 -blocking 1
+    puts $sock $fulltext
+    flush $sock
+
+    # read back whatever consolesrv2 replies with for this command
+    set result [gets $sock]
+    puts $sock "done"
+    flush $sock
+    catch {gets $sock} ;# consume the "closing" reply, if any
+    close $sock
+
+    puts "sendproc: sent $procname to $ip:$port -> $result"
+}
 
 proc fetch3 {ip {port 9996}} {
     global data tagdefs
+    
     set sock [socket $ip $port]
     fconfigure $sock -translation binary -encoding utf-8 -blocking 1
 
@@ -102,6 +152,9 @@ proc fetch3 {ip {port 9996}} {
     console eval {.console see end}
     puts "fetch3: done, [string length $data] bytes processed"
 }
-history add {fetch3 192.168.118.130 9996}
+history add {fetch3 192.168.118.130 9996 ;  console eval {after 200 {tk::ConsoleHistory prev ; focus .console}}}
+history add {fetch3 127.0.0.1 9996  ;  console eval {after 200 {tk::ConsoleHistory prev; focus .console}}}
 console show
 
+set ipvar "192.168.118.130"
+source {D:/podcasts/console servers and clients/consolemonitor_addon.tcl}
