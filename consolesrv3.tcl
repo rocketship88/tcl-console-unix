@@ -8,7 +8,7 @@
 # flat list.
 #
 # Usage: source this into your running wish app. Then use the
-# companion client (consoleclient.tcl, fetch proc) pointed at
+# companion client (consoleclient3.tcl, fetch3 proc) pointed at
 # port 9996.
 
 namespace eval ::consolesrv3 {}
