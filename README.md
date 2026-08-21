@@ -1,92 +1,121 @@
-# TIP 561: Console Command for Linux/Unix
+# Tk `console` command for Unix (TIP 561)
 
-This repository contains the **working console implementation** for TIP 561, which proposes adding official support for the `console` command on Linux and other Unix platforms.
+This repository contains the implementation and supporting tools for
+[TIP 561](tip-561-draft.md), which brings the `console` command —
+already available on Windows and macOS — to Tk on Linux/Unix.
 
-Note: the new TIP will use the files consolecmd.tcl and consolecmd.impl whereas an earlier version that was using a module and a stub are no longer being considered. Those files will remain for reference only.
+Full background, rationale, and implementation details are in
+[`tip-561-draft.md`](tip-561-draft.md). This README covers only how
+to use the code in this repository.
 
-## Overview
+## Using the console without waiting on the TIP
 
-Currently, the console command works "out of the box" on Windows and macOS, but requires additional code on Linux/Unix. This TIP proposes making console support a standard feature across all Tk-enabled platforms.
-
-## About This File
-
-This `consolecmd.impl` file is the **core implementation** that provides the console functionality once activated. 
-
-**Important:** The full TIP 561 proposal delays initialization of this console until a user explicitly issues a console command (like `console show`). This ensures backward compatibility - Unix/Linux users who don't want the console will see no behavior change, with stdout/stderr continuing to go to the terminal as before.
-
-See the [TIP 561 document](https://core.tcl-lang.org/tips/doc/trunk/tip/561.md)for the complete wrapper implementation that provides this lazy initialization behavior.
-
-## Key Improvements in This Implementation
-
-### 1. Working Channel Transform Support (Tcl 8.6+)
-
-The primary enhancement is a properly functioning channel transform implementation that correctly handles Unicode output.
-
-**The Problem:** Previous channel transform attempts failed to display Unicode characters correctly. For example:
-```tcl
-puts "hello \u21a9 there"
-# Would display: hello â© there  (incorrect)
-# Should display: hello ↩ there  (correct)
-```
-
-**The Solution:** Channel transforms receive UTF-8 encoded bytes from stdout/stderr, but the Tk console widget expects Unicode strings. The fix decodes the bytes before passing them to the console:
-
-```tcl
-proc write {what x data} {
-    set data [encoding convertfrom utf-8 $data]
-    set data [string map {\r ""} $data]
-    $consoleInterp eval [list ::tk::ConsoleOutput $what $data]
-    return ""
-}
-```
-
-This approach eliminates the need for the pre-8.6 `puts` wrapper method, which required renaming and redefining the `puts` command.
-
-### 2. Proper Console Cleanup and Output Restoration
-
-When the console window is closed, output is now correctly restored to the terminal:
-
-- Uses `wm protocol . WM_DELETE_WINDOW` instead of `bind <Destroy>` to catch the close event early
-- Properly pops channel transforms and restores terminal encoding
-- Insures that multiple console show commands only push/pop one transform
-- Restores stdin/stdout properly when console is closed or console hide is used.
-
-### 3. Improved Keyboard Shortcuts
-
-Added platform-consistent font size controls:
-- `Control+=` (unshifted) in addition to `Control++`
-- Keypad `Control+KP_Add` and `Control+KP_Subtract`
-- Unix style middle click operation is supported but on Unix only
-
-
-## Usage
-
-For testing purposes, you can source this file directly:
+Should TIP 561 not be approved, or in the meantime before it is, the
+console command can still be used on any Linux/Unix system by
+manually sourcing the implementation and showing it:
 
 ```tcl
 source consolecmd.impl
 console show
 ```
 
-In the final TIP 561 implementation, the wrapper code ensures the console is only initialized when explicitly requested by the user. In the tclIndex implementation, this is handled by that lazy loading implemenation, rather than new code to do the same thing.
+No other changes to Tk are required for this to work.
 
-## Benefits
+## Remote console tools
 
-1. **Platform Consistency**: Eliminates the incompatibility between Windows/macOS and Linux/Unix
-2. **Clean Implementation**: Uses official channel transform API instead of command renaming hacks
-3. **Unicode Support**: Properly handles international characters and symbols
-4. **Future-Proof**: Uses documented APIs that won't break in future Tcl releases
-5. **Backward Compatible**: Existing Unix/Linux behavior unchanged unless console is explicitly invoked
+This repository also includes a small set of tools built on top of
+`console eval`, for mirroring and remotely driving a console running
+on another machine (for example, a headless container). These were
+built as a demonstration of what's possible on top of the console
+command as specified in the TIP, and as genuinely useful debugging
+utilities in their own right. None of them require any change to
+`console` itself.
 
-## Related Links
+**Security note:** none of these servers implement authentication or
+encryption. They are intended for use on a trusted network only
+(localhost, an SSH tunnel, or an isolated container network) — never
+expose one of these ports directly to an untrusted network.
 
-- [TIP 561 Proposal](https://core.tcl-lang.org/tips/doc/trunk/tip/561.md) (if available)
-- [Original Tcl'ers Wiki Code](https://wiki.tcl-lang.org/page/console)
+### Servers (run on the machine being observed/debugged)
 
-## Testing
+| File | Port | Purpose |
+|---|---|---|
+| `consolesrv1.tcl` | 9998 | One-shot: on connect, sends the console's current contents as plain text, then closes. |
+| `consolesrv2.tcl` | 9997 | Persistent, multi-connection remote-eval server. Compatible with tkcon's socket-attach (Host:/Port:) feature. Reads a command, evaluates it, and writes back the result — repeating until the client sends `done`. Buffers multi-line input using `info complete`, with a 2-second timeout on incomplete commands, so pasted multi-line code (e.g. a `proc`) works reliably. |
+| `consolesrv3.tcl` | 9996 | One-shot: on connect, sends the console's full contents *with* tag information (colors, fonts), via the text widget's `dump` command, then closes. |
 
-Tested on:
-- Pop!_OS Linux (Ubuntu-based)
-- Tcl/Tk 8.6+
+Source the appropriate file(s) into the running application whose
+console you want to expose.
 
-The implementation should work on any Unix-like system with Tcl/Tk 8.6 or later.
+### Clients
+
+| File | Pairs with | Purpose |
+|---|---|---|
+| `consoleclient1.tcl` | `consolesrv1.tcl` | `fetch1 <ip> [port 9998]` — fetches and displays the remote console's plain text contents in the local console. |
+| `consoleclient3.tcl` | `consolesrv3.tcl` | `fetch3 <ip> [port 9996]` — fetches the remote console's full tagged contents (colors, fonts) and reconstructs it faithfully in the local console. Also provides `sendproc <procname> [ip] [port 9997]` (see below). |
+
+### `sendproc`: sending a proc to a remote console
+
+tkcon's socket-attach feature runs everything you type through Tcl's
+`subst`, which silently corrupts backslash sequences that aren't
+recognized Tcl escapes — for example `\d+` in a regular expression
+becomes `d+`. This makes it unreliable for pasting Tcl source code
+(such as a `proc` definition) into tkcon when attached via a socket.
+
+`sendproc`, included in `consoleclient3.tcl`, works around this by
+never going through tkcon at all. Define or paste the proc you want
+to send into your own *local* console, then run:
+
+```tcl
+sendproc <procname> [ip] [port 9997]
+```
+
+This reconstructs the proc's real definition locally (via `info
+args`/`info default`/`info body`, list-quoted for safety) and sends
+it as a single, untouched write directly to a `consolesrv2` instance
+— no `subst`, no risk of backslash corruption. If `ip` is omitted, it
+defaults to the current value of the global `ipvar` (see the monitor
+tool below); if that isn't set either, you'll get a clear connection
+error rather than a silent failure.
+
+### Console monitor
+
+`consolemonitor_addon.tcl` is a small GUI that gives a near-live
+mirror of a remote console. It polls the remote console's insert
+position once a second over a persistent `consolesrv2` connection;
+whenever that changes, it automatically calls `fetch3` to refresh the
+local mirror — so any `puts`/`puts stderr` output produced by
+commands run through tkcon (or anything else happening in the
+target process) shows up locally, in the correct colors, without
+needing to view the target machine's screen directly.
+
+**On the remote (target) machine**, both `consolesrv2.tcl` and
+`consolesrv3.tcl` need to be sourced into the running application
+before the monitor can connect — the monitor uses `consolesrv2` for
+polling/eval and `consolesrv3` for fetching the full tagged dump.
+
+The GUI provides:
+
+- an IP address entry (with a **Copy** button), backed by the global
+  `ipvar`
+- a **monitoring** checkbox — checking it connects to the remote and
+  starts polling, with the very first poll always fetching regardless
+  of whether anything has actually changed yet. Unchecking it closes
+  the connection to `consolesrv2` and pauses monitoring entirely;
+  re-checking it reconnects and resumes. Note that while monitoring
+  is on, the local console's contents are replaced on every detected
+  remote update — so if you're typing commands directly into the
+  local console while monitoring is active, an update from the
+  remote side could clear what you were entering.
+- a **Clear Remote** button, which clears the remote console
+- a note reminding you to use port 9997 in tkcon for the eval
+  connection
+- an **Exit** button
+
+`consolemonitor_addon.tcl` already includes, at the end of the file,
+the code needed to run it as a standalone, double-clickable script
+(or via `wish <filename>`). It sources `consoleclient3.tcl`
+automatically at startup (which must be in the same directory) and
+sets a default IP address shown in the entry field — edit that
+default directly in the script if your usual target machine's
+address is different.
