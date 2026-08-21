@@ -2,10 +2,7 @@
 #
 # This file uses fetch3, which is defined in consoleclient3.tcl - so
 # that file must be sourced first (or this file appended directly to
-# the end of it). To use as a separate file:
-#
-#   source /pathto/consoleclient3.tcl
-#   source /pathto/consolemonitor_addon.tcl
+# the end of it). 
 #
 # To preload a default IP address into the entry field, set the
 # global "ipvar" to the desired value just BEFORE sourcing this
@@ -15,6 +12,13 @@
 #   source /pathto/consoleclient3.tcl
 #   set ipvar "192.168.118.130"
 #   source /pathto/consolemonitor_addon.tcl
+#
+# Or if both files are in the same directory, one can enable
+# the lines at the bottom of this file and simply run this script. It
+# also has a line to setup a default ip address, use your own there.
+# then you can just run this:
+# 
+#   wish /pathto/consolemonitor_addon.tcl
 #
 # Note: this file ends by entering its own polling loop (via the
 # "wait" proc), so nothing placed after the "source" line in the
@@ -216,6 +220,20 @@ proc ::monitor::BuildGUI {} {
     grid columnconfigure .monitorgui 1 -weight 1
 
     wm protocol .monitorgui WM_DELETE_WINDOW ::monitor::ExitProgram
+}
+
+
+# enable this script to start mirror
+#
+if {0} {
+    set ipvar "192.168.118.130"
+    
+    if { [file exist [set temp [file join [file dir [info script]] consoleclient3.tcl]]] }  {
+    	source $temp
+    	console show
+    } else {
+        puts stderr "cannot source $temp"
+    }
 }
 
 ::monitor::BuildGUI
