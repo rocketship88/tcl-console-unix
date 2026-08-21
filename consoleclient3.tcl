@@ -152,9 +152,3 @@ proc fetch3 {ip {port 9996}} {
     console eval {.console see end}
     puts "fetch3: done, [string length $data] bytes processed"
 }
-history add {fetch3 192.168.118.130 9996 ;  console eval {after 200 {tk::ConsoleHistory prev ; focus .console}}}
-history add {fetch3 127.0.0.1 9996  ;  console eval {after 200 {tk::ConsoleHistory prev; focus .console}}}
-console show
-
-set ipvar "192.168.118.130"
-source {D:/podcasts/console servers and clients/consolemonitor_addon.tcl}
