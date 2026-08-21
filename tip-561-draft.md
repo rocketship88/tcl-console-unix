@@ -8,7 +8,7 @@
 	Post-History:
 	Tcl-Version:    9.1
 	Keywords:       Tk
-	Tk-Branch:      tip-561
+	Tk-Branch:      tip-561-revised
 ------
 
 # Abstract
@@ -18,8 +18,24 @@ command for Linux and other Unix platforms (hereafter called Unix). A console
 can currently be run under Unix, but it requires additional code that is not
 part of Tk itself. This TIP proposes that official support be given for the
 `console` command on Unix, using Tcl's existing autoloading mechanism
-(`tclIndex`), with no changes required to Tk's C core and no changes at all to
-the existing Windows or Mac implementations.
+(`tclIndex`), with no changes required to Tk's C core.
+
+Testing during development of this TIP found that the same gap - no
+`console` command available at all - also exists in some configurations on
+Windows and macOS: specifically `tclsh` with Tk loaded via
+`package require Tk` on Windows, and `wish` launched from a terminal on
+macOS (as opposed to double-clicking an app bundle), with the same expected
+to hold for `tclsh` with `package require Tk` on macOS as well. In all
+`tclsh` cases, `console` remains an entirely undefined command - not merely
+inert - until `package require Tk` is actually issued, since `tk/library`
+(and its `tclIndex`) is only added to Tcl's search path as part of Tk's own
+initialization; this is no different from any other Tk library command's
+availability before Tk is loaded. Since the mechanism proposed here (Tcl's `unknown`/autoload hook) is
+only ever consulted when a command does not already exist, it has no effect
+at all wherever a platform's native `console` implementation is already
+present - it only fills the same gap, using the same mechanism, wherever
+that gap is found. No changes are made to the existing native
+implementations on any platform.
 
 # Rationale and Discussion
 
@@ -73,13 +89,17 @@ original call to it. From that point on, `console` behaves as a normal,
 permanently-defined command, exactly like any other autoloaded Tk command.
 
 Until `console` is called for the first time, stdout and stderr continue to
-go to the terminal window where `wish` was invoked, unchanged from current
-behavior.
+go to the terminal window unchanged from current behavior, regardless of
+whether Tk was loaded via `wish` or via `tclsh` with `package require Tk`.
 
 The existing `console.tcl` (the shared script that defines the console
 window's own behavior - text widget, menus, bindings - used by Windows and
-Mac as well as this new Unix support) is not modified at all. Windows and Mac
-are unaffected by this proposal.
+Mac as well as this new Unix support) is not modified at all. Wherever a
+platform already provides `console` natively, this proposal has no effect
+whatsoever, since `unknown` is only ever consulted for a command that does
+not already exist. See the Abstract for the specific Windows and macOS
+configurations where no native implementation exists today, and where this
+proposal fills that gap the same way it does on Unix.
 
 ## Differences in Behavior Across Systems
 
@@ -103,11 +123,21 @@ Once `console show` has been called, stdout/stderr are redirected to the
 console window until the window is closed (via the window's close button)
 or `console hide` is called, at which point output reverts to the terminal.
 
+The same hidden-by-default behavior applies equally to the Windows and
+macOS configurations described in the Abstract where this proposal fills a
+gap rather than being unnecessary - a user in `tclsh` on Windows, or `wish`
+from a Terminal on macOS, sees no change at all unless they explicitly call
+`console`. The same is expected for `tclsh` with `package require Tk` on
+macOS, since the underlying native trigger checks `isatty` at the point Tk
+is loaded regardless of which binary loaded it, though this specific
+combination has not been directly tested.
+
 # Implementation
 
-The following has been implemented and tested (Linux, both from `wish` and
-from `tclsh` with Tk loaded via `package require Tk`), fixing several issues
-found during testing beyond the original wiki code:
+The following has been implemented and tested via real builds on Linux and
+Windows (both `wish` and `tclsh` with Tk loaded via `package require Tk`),
+and confirmed working on macOS, fixing several issues found during testing
+beyond the original wiki code:
 
 - The console window no longer flashes visible as a side effect of loading;
   it stays hidden until `console show` is explicitly called (including when
@@ -131,6 +161,9 @@ Reference implementation:
 and
 [consolecmd.impl](https://github.com/rocketship88/tcl-console-unix/blob/main/consolecmd.impl).
 
+This has also been committed directly to the tk repository, on branch
+[tip-561-revised](https://core.tcl-lang.org/tk/timeline?r=tip-561-revised).
+
 # A Note on `console eval` as a Semi-Public Interface
 
 Beyond simply opening a console window, `console eval` gives a script direct access to the
@@ -152,8 +185,22 @@ set of related internals it documents as a semi-public interface worth
 keeping stable going forward, given how much existing code already quietly
 depends on it.
 
-As one small example of what this already enables: undo/redo can be added to
-the console with nothing more than
+The `hide` and `show` console subcommands are designed around normal
+Unix terminal use: `hide` pops the transforms, and output resumes going
+to the terminal exactly as it did before the console was first shown.
+
+For cases where this is not the desired behavior — for example, if
+output should keep accumulating in the console's own buffer even while
+it is hidden — the console's toplevel can be withdrawn and deiconified
+directly instead, leaving the transforms in place:
+
+```tcl
+console eval {wm withdraw .}   ;# hide console, but keep capturing output
+console eval {wm deiconify .}  ;# show console again
+```
+
+As another small example of what this enables: undo/redo can be added
+to the console with nothing more than:
 
 ```tcl
 console eval {
@@ -163,7 +210,7 @@ console eval {
 }
 ```
 
-with no core changes required at all - a documentation-only addition, offered
+Neither require any core changes at all - a documentation-only addition, offered
 here simply as evidence of how much is already possible through this
 interface as it stands today.
 
