@@ -1,24 +1,15 @@
 # consolemonitor_addon.tcl
 #
 # This file uses fetch3, which is defined in consoleclient3.tcl - so
-# that file must be sourced first (or this file appended directly to
-# the end of it). 
-#
-# To preload a default IP address into the entry field, set the
-# global "ipvar" to the desired value just BEFORE sourcing this
-# file, a complete small setup script would be:
-#
-#   console show
-#   source /pathto/consoleclient3.tcl
-#   set ipvar "192.168.118.130"
-#   source /pathto/consolemonitor_addon.tcl
-#
-# Or if both files are in the same directory, one can enable
-# the lines at the bottom of this file and simply run this script. It
-# also has a line to setup a default ip address, use your own there.
-# then you can just run this:
+# that file must be sourced first. To do this, the code assumes
+# that both files are in the same directory. Then this file can be
+# double clicked in windows or, use this from the command line
 # 
 #   wish /pathto/consolemonitor_addon.tcl
+#
+# To set the DEFAULT ip address, see the lines at the bottom and
+# set ipvar to your choice. Once running, and ip is set, click 
+# the monitoring checkbox to start. To pause, uncheck it.
 #
 # Note: this file ends by entering its own polling loop (via the
 # "wait" proc), so nothing placed after the "source" line in the
@@ -223,16 +214,16 @@ proc ::monitor::BuildGUI {} {
 }
 
 
-# enable this script to start mirror
+# use this script to start mirror
 #
-if {0} {
-    set ipvar "192.168.118.130"
-    
+if {yes} {
+    set ipvar "192.168.118.130" ;# default ip address for text entry
+    console show
+   
     if { [file exist [set temp [file join [file dir [info script]] consoleclient3.tcl]]] }  {
     	source $temp
-    	console show
     } else {
-        puts stderr "cannot source $temp"
+        puts stderr "cannot find source $temp\nMust be in the same directory with this file: [info script]"
     }
 }
 
