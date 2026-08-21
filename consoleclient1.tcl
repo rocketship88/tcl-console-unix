@@ -31,5 +31,4 @@ proc fetch1 {ip {port 9998}} {
 
     puts "fetch1: done, [string length $data1] bytes"
 }
-history add {fetch1 192.168.118.130 9998}
-console show
+
