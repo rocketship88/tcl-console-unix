@@ -133,3 +133,9 @@ The remote tcl program to be monitoring and debugged, needs to have sourced cons
 Replace user with an account on the remote machine, and remote-host with its address — either a hostname or a numeric IP both work. Any account with SSH login access on the remote machine can be used; the tunnel itself doesn't require any special privileges.
 
 This opens ports 9997 and 9996 on your local machine, tunneled through an encrypted connection to the same ports on the remote machine. Once connected, point tkcon's socket-attach at 127.0.0.1, port 9997, and the monitoring tool's IP field at 127.0.0.1 as well (for port 9996) — both now route through the encrypted tunnel rather than connecting to the remote machine's address directly.
+
+This command will then give you a prompt from the shell on the remote end. When you want to shut everything down, type
+
+```
+   exit
+```
