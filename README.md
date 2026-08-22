@@ -34,7 +34,7 @@ utilities in their own right. None of them require any change to
 **Security note:** none of these servers implement authentication or
 encryption. They are intended for use on a trusted network only
 (localhost, an SSH tunnel, or an isolated container network) — never
-expose one of these ports directly to an untrusted network.
+expose one of these ports directly to an untrusted network. See below about setting up an ssh secure tunnel.
 
 ### Servers (run on the machine being observed/debugged)
 
@@ -119,3 +119,17 @@ automatically at startup (which must be in the same directory) and
 sets a default IP address shown in the entry field — edit that
 default directly in the script if your usual target machine's
 address is different.
+
+### Setting up a secure ssh tunnel
+
+To setup a secure tunnel using ssh, the remote side needs to have ssh servers running, and the local side, running the monitoring client and Tkcon, needs only the ssh client.
+
+The remote tcl program to be monitoring and debugged, needs to have sourced consolesrv2.tcl and consolesrv3.tcl and then run the following on the local end (the machine running the monitoring tool and/or tkcon):
+
+```
+    ssh -L 9997:localhost:9997 -L 9996:localhost:9996 user@remote-host
+```
+
+Replace user with an account on the remote machine, and remote-host with its address — either a hostname or a numeric IP both work. Any account with SSH login access on the remote machine can be used; the tunnel itself doesn't require any special privileges.
+
+This opens ports 9997 and 9996 on your local machine, tunneled through an encrypted connection to the same ports on the remote machine. Once connected, point tkcon's socket-attach at 127.0.0.1, port 9997, and the monitoring tool's IP field at 127.0.0.1 as well (for port 9996) — both now route through the encrypted tunnel rather than connecting to the remote machine's address directly.
