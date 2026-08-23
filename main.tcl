@@ -1,8 +1,8 @@
 # main.tcl
 #
 # This file can be sourced to enable some debugging commands
-# l* where we have la lh lf lg lw lp lpm and ltree
-# for list array, history, file, globals, widget, proc, method, and widget tree
+# l* where we have la lh lf lg lw lp lpm ls and ltree
+# for list array, history, file, globals, widget, proc, method, folder, and widget tree
 #
 # also enables some extra console buttons and an extra menu
 # the gui widget tree tool needs BWidgets, it will also add
