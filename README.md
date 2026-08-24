@@ -94,6 +94,25 @@ needing to view the target machine's screen directly.
 before the monitor can connect — the monitor uses `consolesrv2` for
 polling/eval and `consolesrv3` for fetching the full tagged dump.
 
+The target machine also needs to run ```console show``` in order to
+activate the console and enable output to stdout and stderr to go to
+the console. If one does not want the console visible but also desires
+the output to go to the console rather than a linux terminal, then it
+should issue the following command (immediately after the console show):
+
+```tcl
+   console eval {wm withdraw .}
+```
+
+To make the console visible again on the remote end, one can issue:
+
+```tcl
+   console eval {wm deiconify .}
+```
+If the standard `console hide` is used, the channel transforms are removed 
+and output goes to the terminal instead of the console window. See the TIP-561
+for more information on this behavior.
+
 The GUI provides:
 
 - an IP address entry (with a **Copy** button), backed by the global
@@ -112,7 +131,7 @@ The GUI provides:
   connection
 - an **Exit** button
 
-`consolemonitor_addon.tcl` already includes, at the end of the file,
+`consolemonitor_addon.tcl` includes, at the end of the file,
 the code needed to run it as a standalone, double-clickable script
 (or via `wish <filename>`). It sources `consoleclient3.tcl`
 automatically at startup (which must be in the same directory) and
