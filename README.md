@@ -153,7 +153,9 @@ Replace user with an account on the remote machine, and remote-host with its add
 
 This opens ports 9997 and 9996 on your local machine, tunneled through an encrypted connection to the same ports on the remote machine. Once connected, point tkcon's socket-attach at 127.0.0.1, port 9997, and the monitoring tool's IP field at 127.0.0.1 as well (for port 9996) — both now route through the encrypted tunnel rather than connecting to the remote machine's address directly.
 
-This command will then give you a prompt from the shell on the remote end. When you want to shut everything down, type
+This command will result in a prompt from the shell on the remote end. You can tunnel once again to the next hop if need be, using the same command except user2@remote-host2 ... and keep tunneling until you reach your ultimate target. This works for example, to go from one machine to a host for a nat'd VM  and then to the nat'd VM which cannot be reached directly, but only through the VM's host machine.
+
+When you want to shut everything down, type (possibly multiple times for multiple tunnels)
 
 ```
    exit
