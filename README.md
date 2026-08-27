@@ -89,10 +89,12 @@ commands run through tkcon (or anything else happening in the
 target process) shows up locally, in the correct colors, without
 needing to view the target machine's screen directly.
 
-**On the remote (target) machine**, both `consolesrv2.tcl` and
-`consolesrv3.tcl` need to be sourced into the running application
+**On the remote (target) machine**, both `consolesrv2.tcl` and at least one of 
+`consolesrv1.tcl` and/or `consolesrv3.tcl` need to be sourced into the running application
 before the monitor can connect — the monitor uses `consolesrv2` for
-polling/eval and `consolesrv3` for fetching the full tagged dump.
+polling/eval and `consolesrv3` for fetching a full tagged dump or
+`consolesrv1.tcl` for plain text. Plain text is faster especially if the value for the console's
+maxLines is very large.
 
 The target machine also needs to run ```console show``` in order to
 activate the console and enable output to stdout and stderr to go to
@@ -126,6 +128,8 @@ The GUI provides:
   remote update — so if you're typing commands directly into the
   local console while monitoring is active, an update from the
   remote side could clear what you were entering.
+- a plain text checkbox - to send only plain text for better performance
+- a spinbox to select several polling interval values
 - a **Clear Remote** button, which clears the remote console
 - a note reminding you to use port 9997 in tkcon for the eval
   connection
