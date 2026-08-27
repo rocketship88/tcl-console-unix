@@ -81,16 +81,15 @@ error rather than a silent failure.
 ### Console monitor
 
 `consolemonitor_addon.tcl` is a small GUI that gives a near-live
-mirror of a remote console. It polls the remote console's insert
-position once a second over a persistent `consolesrv2` connection;
-whenever that changes, it automatically calls `fetch3` to refresh the
+mirror of a remote console. It polls the remote console's state over a persistent `consolesrv2` connection;
+and whenever that changes, it automatically calls `fetch1` or `fetch3` (selectable) to refresh the
 local mirror — so any `puts`/`puts stderr` output produced by
 commands run through tkcon (or anything else happening in the
-target process) shows up locally, in the correct colors, without
+target process) shows up locally without
 needing to view the target machine's screen directly.
 
 **On the remote (target) machine**, both `consolesrv2.tcl` and at least one of 
-`consolesrv1.tcl` and/or `consolesrv3.tcl` need to be sourced into the running application
+`consolesrv1.tcl` or `consolesrv3.tcl` (or both) need to be sourced into the running application
 before the monitor can connect — the monitor uses `consolesrv2` for
 polling/eval and `consolesrv3` for fetching a full tagged dump or
 `consolesrv1.tcl` for plain text. Plain text is faster especially if the value for the console's
