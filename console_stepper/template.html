@@ -222,7 +222,7 @@ pre.code mark.sym.cur { background:var(--pc-b); color:#111; box-shadow:0 0 0 2px
 <main>
   <header class="top">
     <div class="topl">
-      <p class="ver mono">Version 1.7 &middot; Oct 29, 2026</p>
+      <p class="ver mono">Version 1.10 &middot; Oct 30, 2026</p>
       <h1>Tk Console on Unix: <span>Channel Transform Stepper</span></h1>
       <p class="lede">TIP 561 adds the <code>console</code> command to Unix. Follow a <code>puts</code> containing a <code>\u21a9</code> escape from the script, through the channel's encoding and the transform's <code>write</code> method, to the text widget in the console window. Pick a script below: the first shows how <code>tclIndex</code> brings the command into existence; the others show output going to the terminal, then to the console, and back.</p>
     </div>
@@ -256,6 +256,7 @@ pre.code mark.sym.cur { background:var(--pc-b); color:#111; box-shadow:0 0 0 2px
       <select id="speed" title="Seconds per step during Auto-play" aria-label="Seconds per step"><option>0.5</option><option>1</option><option selected>1.5</option><option>2</option><option>3</option><option>5</option></select><span class="spd">s/step</span>
       <button id="b-play">Auto-play</button>
       <label class="allbox" title="Auto-play carries on from one script to the next"><input type="checkbox" id="playall"> all</label>
+      <label class="allbox" id="readBox" title="Speak each step’s explanation aloud. During Auto-play the next step starts when the voice has finished."><input type="checkbox" id="readOn"> Read aloud</label><select id="voiceSel" hidden aria-label="Voice" title="Voice (the ones your browser and system provide)"></select><select id="rateSel" hidden aria-label="Speaking speed" title="Speaking speed"><option value="0.8">slow</option><option value="1" selected>normal</option><option value="1.2">fast</option><option value="1.5">faster</option></select>
       <button id="b-code">Show code</button>
     </div>
   </div>
@@ -414,7 +415,7 @@ SC.push(function () {
     ['The interpreter looks for a command named <code>console</code> and does not find one, so it calls <code>unknown</code>. That procedure comes from Tcl\u2019s <code>init.tcl</code>; before reporting an error it tries autoloading.'],
     { nocode: 'Tcl core: init.tcl\u2019s <code>unknown</code> procedure. Not part of this TIP.', hl: ['console', 'cur'] });
   S('auto_load looks in the index',
-    ['Autoloading consults the <code>auto_index</code> array. Tk puts its library directory on <code>auto_path</code>, and the <code>tclIndex</code> file there fills in <code>auto_index</code>. TIP 561 adds one line to that file: <code>console</code> maps to a script that sources <code>consolecmd.tcl</code>.'],
+    ['Autoloading consults the <code>auto_index</code> array. Tk adds its library directory to <code>auto_path</code>, and the <code>tclIndex</code> file there fills in <code>auto_index</code>. TIP 561 adds one line to that file: <code>console</code> maps to a script that sources <code>consolecmd.tcl</code>.'],
     { code: [R('tclIndex', 'set auto_index(console)', 1)], hl: ['console', 'cur'], set: function (s) { s.kv.autoload = 'index hit'; } });
   S('The stub is sourced',
     ['<code>unknown</code> evaluates the index entry, which sources <code>consolecmd.tcl</code>. The file creates a namespace, records the directory it came from, and defines one small procedure named <code>console</code>.', 'That is all. It creates no interpreter, loads no Tk and opens no window, which is what makes it safe for <code>auto_mkindex</code> to source when the index is built.'],
@@ -740,6 +741,7 @@ function render() {
   $('decBox').style.display = cs.hasDec ? '' : 'none';
   [].forEach.call($('scenSeg').children, function (b, i) { b.setAttribute('aria-pressed', i === si ? 'true' : 'false'); });
   [].forEach.call($('decSeg').children, function (b) { b.setAttribute('aria-pressed', b.dataset.v === O.dec ? 'true' : 'false'); });
+  if (speechOn()) speakStep();
   if (!$('codeview').hidden) {   /* the code view follows the steps: jump to this step's code */
     var cst = cs.steps[cur]; cv.stack = []; cv.sym = null; focusSig = '';
     if (cst.code && cst.code[0]) cv.file = cst.code[0].f;
@@ -758,10 +760,117 @@ function prev() { if (cur > 0) { cur--; render(); } }
 $('b-next').onclick = function () { stopPlay(); next(); };
 $('b-prev').onclick = function () { stopPlay(); prev(); };
 $('b-reset').onclick = function () { stopPlay(); cur = 0; render(); };
-var timer = null;
-function stopPlay() { if (timer) { clearTimeout(timer); timer = null; } $('b-play').textContent = 'Auto-play'; }
-function tick() { if (!next()) { stopPlay(); return; } timer = setTimeout(tick, parseFloat($('speed').value) * 1000); }
-function startPlay() { if (cur >= cs.steps.length - 1 && !($('playall').checked && si < SC.length - 1)) { cur = 0; render(); } $('b-play').textContent = 'Pause'; timer = setTimeout(tick, parseFloat($('speed').value) * 1000); }
+var timer = null;   /* null: not playing; a timeout id: playing on the timer; 'speech': playing, each step waits for the voice to finish */
+function stopPlay() { if (timer && timer !== 'speech') clearTimeout(timer); timer = null; stopSpeech(); $('b-play').textContent = 'Auto-play'; }
+function tick() {
+  if (speechOn()) timer = 'speech';
+  if (!next()) { stopPlay(); return; }
+  if (!speechOn()) timer = setTimeout(tick, parseFloat($('speed').value) * 1000);
+}
+function startPlay() {
+  var restart = cur >= cs.steps.length - 1 && !($('playall').checked && si < SC.length - 1);
+  $('b-play').textContent = 'Pause';
+  if (speechOn()) { timer = 'speech'; if (restart) cur = 0; render(); }   /* render speaks the step; when the voice is done the next one follows */
+  else { if (restart) { cur = 0; render(); } timer = setTimeout(tick, parseFloat($('speed').value) * 1000); }
+}
+/* ---------- read aloud: the speech synthesis of the browser, one step at a time ---------- */
+var speakTok = 0, voices = [];
+function speechOn() { return !!(window.speechSynthesis && $('readOn') && $('readOn').checked); }
+function stopSpeech() { speakTok++; try { if (window.speechSynthesis) speechSynthesis.cancel(); } catch (e) {} }
+function spell(h) { return h.toUpperCase().split('').join(' '); }
+function spokenCode(s) {
+  if (s === 'read') return 'reed';
+  if (/^[0-9A-Fa-f]{2}( [0-9A-Fa-f]{2})*$/.test(s) && /[A-Fa-f]/.test(s)) return s.split(' ').map(spell).join(', ');
+  var m = /^U\+([0-9A-Fa-f]{4,6})$/.exec(s); if (m) return 'U plus ' + spell(m[1]);
+  return s.replace(/\\u([0-9a-fA-F]{4})/g, function (x, h) { return ' backslash u ' + spell(h) + ' '; })
+    .replace(/\\r/g, ' backslash r ').replace(/\\n/g, ' backslash n ')
+    .replace(/::/g, ' double colon ').replace(/\$/g, ' dollar ')
+    .replace(/\{\}/g, ' empty braces ').replace(/""/g, ' empty string ')
+    .replace(/\{\*\}/g, ' star ')
+    .replace(/[{}\[\]()<>"]/g, ' ').replace(/(^|\s)-(\w)/g, '$1dash $2')
+    .replace(/([a-z])([A-Z])/g, '$1 $2').replace(/_/g, ' ');
+}
+/* How the voice should say names it gets wrong. Add a line here: [pattern, spoken form]. Applied to the caption text and to the code in it. */
+var PRONOUNCE = [
+  [/consolecmd\.tcl/gi, 'con soul command dot tcl'],
+  [/consolecmd\.impl/gi, 'con soul command dot impl'],
+  [/consolecmd/gi, 'con soul command'],
+  [/consoleinterp/gi, 'con soul interp'],
+  [/console/gi, 'con soul'],
+  [/\.(tcl|impl)\b/gi, ' dot $1'],
+  [/\bstdout\b/gi, 'standard out'],
+  [/\bstderr\b/gi, 'standard error'],
+  [/\bstdin\b/gi, 'standard in'],
+  [/auto[ _]mkindex/gi, 'auto M K index'],
+  [/\bmkindex\b/gi, 'M K index'],
+  [/toplevel/gi, 'top level'],
+  [/\bputs\b/gi, 'put s'],
+  [/fconfigure/gi, 'f configure'],
+  [/iso8859-15/gi, 'I S O eighty eight fifty nine dash fifteen'],
+  [/iso8859-1\b/gi, 'I S O eighty eight fifty nine dash one']
+];
+function spokenClean(s) {
+  PRONOUNCE.forEach(function (r) { s = s.replace(r[0], r[1]); });
+  return s.replace(/\\u(?![0-9a-fA-F]{4})/g, ' backslash u ').replace(/utf-8/gi, 'UTF 8')
+    .replace(/↩/g, 'the arrow').replace(/€/g, 'the euro sign').replace(/¤/g, 'the currency sign').replace(/→/g, 'to').replace(/–/g, ' to ')
+    .replace(/\s+/g, ' ').replace(/\s+([.,;:!?])/g, '$1').trim();
+}
+function spokenParts(step) {
+  var d = document.createElement('div'), out = [spokenClean(step.title)];
+  step.text.forEach(function (h) {
+    d.innerHTML = h;
+    d.querySelectorAll('code').forEach(function (c) { c.textContent = ' ' + spokenCode(c.textContent) + ' '; });
+    out.push(spokenClean(d.textContent));
+  });
+  return out.filter(Boolean);
+}
+function spokenChunks(step) {
+  var chunks = [];
+  spokenParts(step).forEach(function (p) {
+    var cur2 = '';
+    p.split(/(?<=[.!?:;])\s+/).forEach(function (sn) { if (cur2 && (cur2 + ' ' + sn).length > 180) { chunks.push(cur2); cur2 = sn; } else cur2 = cur2 ? cur2 + ' ' + sn : sn; });
+    if (cur2) chunks.push(cur2);
+  });
+  return chunks;
+}
+function speakStep() {
+  stopSpeech();
+  var tok = speakTok, chunks = spokenChunks(cs.steps[cur]), rate = parseFloat($('rateSel').value) || 1, vname = $('voiceSel').value;
+  var voice = voices.filter(function (v) { return v.name === vname; })[0];
+  (function nxt(i) {
+    if (tok !== speakTok) return;
+    if (i >= chunks.length) { speechDone(tok); return; }
+    var u = new SpeechSynthesisUtterance(chunks[i]); u.rate = rate; if (voice) { u.voice = voice; u.lang = voice.lang; }
+    u.onend = function () { nxt(i + 1); }; u.onerror = function () { nxt(i + 1); };
+    try { speechSynthesis.speak(u); } catch (e) { speechFailed(); }
+  })(0);
+}
+function speechFailed() {   /* the browser refused to speak: switch Read aloud off and carry on with the timer */
+  speakTok++; $('readOn').checked = false; $('voiceSel').hidden = $('rateSel').hidden = true; $('readBox').title = 'The browser would not start speech here (some embedded viewers block it). Try the page in a normal browser tab.';
+  if (timer === 'speech') timer = setTimeout(tick, parseFloat($('speed').value) * 1000);
+}
+function speechDone(tok) {   /* during Auto-play the next step follows a short pause after the voice has finished */
+  if (timer !== 'speech') return;
+  setTimeout(function () { if (timer === 'speech' && tok === speakTok) tick(); }, 600);
+}
+function fillVoices() {
+  if (!window.speechSynthesis) return;
+  voices = speechSynthesis.getVoices() || [];
+  var sel = $('voiceSel'), keep = sel.value; var saved = ''; try { saved = localStorage.getItem('consoleStepperVoice') || ''; } catch (e) {}
+  var lang = (navigator.language || 'en').slice(0, 2);
+  var list = voices.filter(function (v) { return v.lang && v.lang.slice(0, 2) === lang; }); if (!list.length) list = voices;
+  sel.innerHTML = list.map(function (v) { return '<option value="' + esc(v.name).replace(/"/g, '&quot;') + '">' + esc(v.name) + '</option>'; }).join('');
+  var want = keep || saved; if (want && list.some(function (v) { return v.name === want; })) sel.value = want;
+  else { var d = list.filter(function (v) { return v.default; })[0]; if (d) sel.value = d.name; }
+}
+if (!window.speechSynthesis) { $('readOn').disabled = true; $('readBox').title = 'This browser has no speech output, so Read aloud is not available here.'; }
+else {
+  fillVoices(); if (speechSynthesis.addEventListener) speechSynthesis.addEventListener('voiceschanged', fillVoices); else speechSynthesis.onvoiceschanged = fillVoices;
+  try { $('readOn').checked = false; var rt = localStorage.getItem('consoleStepperRate'); if (rt) $('rateSel').value = rt; } catch (e) {}
+  $('readOn').addEventListener('change', function () { $('voiceSel').hidden = $('rateSel').hidden = !this.checked; if (this.checked) { fillVoices(); speakStep(); } else { stopSpeech(); if (timer === 'speech') { stopPlay(); } } });
+  $('voiceSel').addEventListener('change', function () { try { localStorage.setItem('consoleStepperVoice', this.value); } catch (e) {} if (speechOn()) speakStep(); });
+  $('rateSel').addEventListener('change', function () { try { localStorage.setItem('consoleStepperRate', this.value); } catch (e) {} if (speechOn()) speakStep(); });
+}
 $('b-play').onclick = function () { timer ? stopPlay() : startPlay(); };
 
 /* ---------- full code view: Tcl tokens, and the nested fold model of the parser stepper ---------- */
