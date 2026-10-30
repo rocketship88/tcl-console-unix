@@ -1,0 +1,1676 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Tk Console Channel Transform Stepper (TIP 561)</title>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Source+Sans+3:wght@400;600;700&family=JetBrains+Mono:wght@400;600&display=swap">
+<style>
+:root {
+  --bg:#f3f5f6; --panel:#ffffff; --fg:#1c2528; --muted:#5d6b70; --line:#d3dade;
+  --accent:#0b6e7a; --accent-fg:#ffffff; --hot:#b3261e; --ok:#1f7a3a;
+  --pc:#fff3c4; --pc-b:#b9770e; --on:#fff3c4; --new:#d6efdc; --newb:#1f7a3a; --grp:#fbe9c8; --grpb:#b9770e; --bad:#fde0dc; --badb:#b3261e;
+  --k-fn:#1556b8; --k-mac:#8a1fa8; --var:#17788a; --cm:#2e7d32; --st:#a31515;
+  --term-bg:#1e2326; --term-fg:#d8dee0; --term-dim:#8b979b; --con-bg:#ffffff; --con-fg:#111; --con-prompt:#8F4433; --con-err:#d00000;
+  --font:"Source Sans 3", system-ui, sans-serif;
+  --mono:"JetBrains Mono", ui-monospace, Menlo, Consolas, monospace;
+}
+@media (prefers-color-scheme: dark) { :root:not([data-theme="light"]) {
+  --bg:#12191b; --panel:#1b2427; --fg:#e3eaec; --muted:#94a3a8; --line:#33434a; --accent:#4fc3d0; --accent-fg:#0a1a1d;
+  --hot:#ff8a80; --ok:#7bd88f; --pc:#4a4318; --pc-b:#e5a53d; --on:#4a4318; --new:#1b3d27; --newb:#4cc473; --grp:#4a3510; --grpb:#e5a53d; --bad:#5a2420; --badb:#ff8a80;
+  --k-fn:#7db4ff; --k-mac:#dc9ff5; --var:#5fd0e0; --cm:#7fc98a; --st:#f0a08a; --term-bg:#0d1214; --con-bg:#232b2e; --con-fg:#e8eef0; --con-prompt:#e0907a; --con-err:#ff7b72; color-scheme:dark; } }
+* { box-sizing:border-box; }
+body { background:var(--bg); color:var(--fg); font-family:var(--font); font-size:16px; line-height:1.5; margin:0; padding-block:20px 40px; padding-left:max(16px, env(safe-area-inset-left, 0px)); padding-right:max(16px, env(safe-area-inset-right, 0px)); }
+main { max-width:1060px; margin-inline:auto; display:flex; flex-direction:column; gap:18px; }
+h1 { font-size:1.6rem; line-height:1.2; margin:0; text-wrap:balance; }
+h2 { font-size:1.05rem; margin:0 0 8px; }
+p { margin:0; }
+code, .mono { font-family:var(--mono); font-size:.88em; }
+.lede { color:var(--muted); max-width:72ch; margin-top:6px; }
+.ver { color:var(--muted); margin:0 0 6px; font-size:.8rem; }
+header.top { display:flex; gap:16px; align-items:flex-start; justify-content:space-between; flex-wrap:wrap; }
+header.top .topl { flex:1 1 420px; min-width:0; }
+kbd { font-family:var(--mono); font-size:.75rem; border:1px solid var(--line); border-bottom-width:2px; border-radius:4px; padding:0 5px; background:var(--bg); color:var(--fg); }
+.keycol { flex:0 1 300px; min-width:220px; }
+.keys { border:1px solid var(--line); border-radius:6px; background:var(--panel); padding:6px 12px; font-size:.8rem; color:var(--muted); }
+.keys b { color:var(--fg); font-size:.78rem; text-transform:uppercase; letter-spacing:.05em; }
+.keys div { margin-top:2px; }
+.keycol .tipline { display:block; margin-top:6px; font-size:.8rem; color:var(--muted); }
+@media (max-width:760px) { header.top { flex-direction:column; } .keycol { flex:none; width:100%; } }
+
+.bar { display:flex; flex-wrap:wrap; gap:10px 16px; align-items:center; justify-content:space-between; }
+.seg { display:inline-flex; flex-wrap:wrap; border:1px solid var(--line); border-radius:6px; overflow:hidden; background:var(--panel); }
+.seg button { border:0; background:transparent; color:var(--fg); font:inherit; padding:7px 12px; cursor:pointer; }
+.seg button[aria-pressed="true"] { background:var(--accent); color:var(--accent-fg); font-weight:600; }
+.seg button:disabled { opacity:.45; cursor:default; }
+.lbl { font-size:.72rem; color:var(--muted); text-transform:uppercase; letter-spacing:.05em; display:block; margin-bottom:3px; }
+.ctl { display:flex; gap:8px; flex-wrap:wrap; align-items:center; }
+.ctl button, .bkbtn, .smallbtn { font:inherit; padding:7px 14px; border:1px solid var(--line); background:var(--panel); color:var(--fg); border-radius:6px; cursor:pointer; }
+.ctl button.primary { background:var(--accent); color:var(--accent-fg); border-color:var(--accent); font-weight:600; }
+.ctl button:disabled { opacity:.4; cursor:default; }
+.ctl select { font:inherit; padding:6px 4px; border:1px solid var(--line); background:var(--panel); color:var(--fg); border-radius:6px; cursor:pointer; }
+.ctl .allbox { display:inline-flex; align-items:center; gap:4px; cursor:pointer; user-select:none; }
+.ctl .spd { margin-left:-4px; font-size:.85rem; color:var(--muted); }
+.bkbtn { border-color:var(--accent); background:transparent; color:var(--accent); }
+.smallbtn { font-size:.82rem; padding:2px 10px; }
+button:focus-visible, select:focus-visible { outline:3px solid var(--accent); outline-offset:2px; }
+.steps { display:flex; gap:3px; flex-wrap:wrap; }
+.steps i { width:12px; height:6px; border-radius:3px; background:var(--line); cursor:pointer; position:relative; }
+.steps i::after { content:''; position:absolute; inset:-9px -2px; }
+.steps i:hover { outline:2px solid var(--accent); outline-offset:1px; }
+.steps i.done { background:var(--accent); opacity:.55; }
+.steps i.cur { background:var(--accent); opacity:1; }
+
+.srcbox { background:var(--panel); border:1px solid var(--line); border-radius:8px; padding:12px 14px; overflow-x:auto; }
+.src { font-family:var(--mono); font-size:1.1rem; white-space:pre; line-height:1.8; }
+.src .where { color:var(--muted); font-size:.78rem; margin-right:10px; user-select:none; }
+.src span.cur { background:var(--pc); outline:2px solid var(--pc-b); border-radius:2px; font-weight:700; }
+.src span.sub { background:var(--grp); outline:2px solid var(--grpb); border-radius:2px; font-weight:700; }
+.src span.done { color:var(--muted); }
+.srcnote { margin-top:4px; font-size:.85rem; color:var(--muted); }
+
+.panes { display:grid; grid-template-columns:1.25fr 1fr; gap:14px; align-items:start; }
+@media (max-width:900px) { .panes { grid-template-columns:1fr; } }
+.pane { background:var(--panel); border:1px solid var(--line); border-radius:8px; padding:12px; min-width:0; }
+.pane h2 { display:flex; justify-content:space-between; align-items:baseline; gap:8px; }
+.pane h2 small { font-weight:400; color:var(--muted); font-size:.74rem; text-align:right; }
+.mini { font-family:var(--mono); font-size:.76rem; line-height:1.45; overflow-x:auto; max-height:360px; overflow-y:auto; cursor:pointer; }
+.mini div { display:flex; gap:8px; padding:0 4px; border-radius:3px; white-space:pre; border:1px solid transparent; }
+.mini .n { color:var(--muted); width:3.2em; text-align:right; flex:none; user-select:none; }
+.mini .on { background:var(--pc); border-color:var(--pc-b); font-weight:600; }
+.mini .sep { color:var(--muted); justify-content:center; }
+.mini .fh { color:var(--muted); font-family:var(--font); font-size:.72rem; margin-top:4px; }
+.nocode { color:var(--muted); font-size:.88rem; border:1px dashed var(--line); border-radius:6px; padding:12px; }
+.alt { margin-top:6px; font-size:.78rem; color:var(--muted); }
+.alt .mini { cursor:default; border:1px dashed var(--line); border-radius:6px; padding:4px 0; margin-top:3px; }
+.hintline { margin-top:6px; font-size:.75rem; color:var(--muted); }
+
+/* channel stacks */
+.stacks { display:grid; grid-template-columns:1fr 1fr; gap:10px; }
+.chan h3 { margin:0 0 4px; font-family:var(--mono); font-size:.8rem; color:var(--muted); font-weight:600; }
+.lay { border:1.5px solid var(--line); border-radius:6px; padding:5px 8px; font-size:.78rem; background:var(--bg); line-height:1.3; }
+.lay small { display:block; color:var(--muted); font-size:.7rem; }
+.lay.tr { border-style:dashed; border-color:var(--accent); }
+.lay.hot { border-color:var(--pc-b); box-shadow:0 0 0 2px var(--pc-b); background:var(--pc); }
+.lay.new { animation:pop .9s ease-out; border-color:var(--newb); background:var(--new); }
+@keyframes pop { 0% { transform:scale(.92); opacity:.2; } 100% { transform:scale(1); opacity:1; } }
+.lay.off { opacity:.45; }
+.chframe { border:1.5px solid var(--accent); border-radius:10px; padding:6px; background:var(--bg); }
+.chname { font-family:var(--mono); font-size:.72rem; color:var(--muted); margin:0 0 4px 2px; }
+.chname b { color:var(--fg); }
+.encstrip { border:1.5px solid var(--line); border-radius:6px; padding:4px 8px; font-size:.76rem; background:var(--panel); line-height:1.3; }
+.encstrip small { display:block; color:var(--muted); font-size:.7rem; }
+.encstrip.hot { border-color:var(--pc-b); box-shadow:0 0 0 2px var(--pc-b); background:var(--pc); }
+.arr { text-align:center; color:var(--muted); font-size:.8rem; line-height:1.1; padding:1px 0; }
+.arr.dead { text-decoration:line-through; color:var(--hot); }
+.arr.dead::after { content:' nothing passes down'; text-decoration:none; display:inline-block; font-size:.68rem; }
+.dest { margin-top:3px; font-size:.7rem; color:var(--muted); text-align:center; }
+.dest.on { color:var(--ok); font-weight:700; }
+.kv { display:grid; grid-template-columns:auto 1fr; gap:3px 10px; font-family:var(--mono); font-size:.76rem; margin-top:12px; border-top:1px solid var(--line); padding-top:8px; }
+.kv span:nth-child(odd) { color:var(--muted); }
+.kv span.chg { background:var(--pc); border-radius:3px; font-weight:700; }
+
+/* value in hand */
+.fl { display:flex; flex-direction:column; gap:10px; }
+.fl .row { display:flex; flex-direction:column; gap:3px; }
+.fl .rl { font-size:.74rem; color:var(--muted); text-transform:uppercase; letter-spacing:.04em; }
+.cells { display:flex; flex-wrap:wrap; gap:3px; }
+.cell { width:42px; border:1px solid var(--line); border-radius:5px; background:var(--bg); text-align:center; padding:2px 0 1px; }
+.cell b { display:block; font-family:var(--mono); font-size:1rem; font-weight:600; line-height:1.3; }
+.cell small { display:block; font-family:var(--mono); font-size:.62rem; color:var(--muted); line-height:1.2; }
+.cell.g1 { background:var(--grp); border-color:var(--grpb); }
+.cell.g2 { background:var(--bad); border-color:var(--badb); }
+.flarrow { color:var(--accent); font-size:.85rem; font-weight:600; }
+.flnote { font-size:.85rem; color:var(--muted); }
+.flempty { color:var(--muted); font-size:.88rem; border:1px dashed var(--line); border-radius:6px; padding:10px; text-align:center; }
+
+/* terminal and console mockups */
+.shows { display:grid; grid-template-columns:1fr 1fr; gap:14px; align-items:start; }
+@media (max-width:760px) { .shows { grid-template-columns:1fr; } }
+.win { border:1px solid var(--line); border-radius:8px; overflow:hidden; background:var(--panel); }
+.win .tb { display:flex; justify-content:space-between; align-items:center; padding:4px 10px; font-size:.78rem; background:var(--bg); border-bottom:1px solid var(--line); color:var(--muted); }
+.win .tb .x { cursor:default; padding:0 6px; border-radius:3px; }
+.win .tb .x.hot { background:var(--pc); outline:2px solid var(--pc-b); color:var(--fg); }
+.win .menu { font-size:.78rem; padding:2px 10px; border-bottom:1px solid var(--line); color:var(--fg); display:flex; gap:12px; }
+.win .body { font-family:var(--mono); font-size:.8rem; line-height:1.4; padding:8px 10px; min-height:132px; white-space:pre-wrap; word-break:break-all; }
+.win.term .body { background:var(--term-bg); color:var(--term-fg); }
+.win.con .body { background:var(--con-bg); color:var(--con-fg); }
+.win .p { color:var(--con-prompt); }
+.win.term .p { color:var(--term-fg); }
+.win .e { color:var(--con-err); }
+.win .t { color:var(--accent); font-weight:600; }
+.win.term .t { color:#9ad6ff; }
+.ctl-ch { background:var(--bad); border-bottom:1px dotted var(--badb); border-radius:2px; }
+.cursor { display:inline-block; width:.55em; height:1.05em; background:currentColor; opacity:.55; vertical-align:-2px; }
+.win.fresh { animation:pop .8s ease-out; }
+.ghost { border:1.5px dashed var(--line); border-radius:8px; min-height:160px; display:flex; align-items:center; justify-content:center; text-align:center; color:var(--muted); font-size:.88rem; padding:16px; }
+.win.flash .body { box-shadow:inset 0 0 0 2px var(--newb); }
+
+.caption { background:var(--panel); border:1px solid var(--line); border-left:5px solid var(--accent); border-radius:6px; padding:14px 16px; }
+.caption .top { font-family:var(--mono); font-size:.84rem; color:var(--muted); margin-bottom:4px; }
+.caption h2 { margin-bottom:4px; }
+.caption p { max-width:80ch; }
+.caption p + p { margin-top:6px; }
+.fine { color:var(--muted); font-size:.88rem; }
+.about { border-top:1px solid var(--line); padding-top:14px; display:flex; flex-direction:column; gap:8px; color:var(--muted); font-size:.9rem; max-width:84ch; }
+.about h2 { color:var(--fg); margin:0; }
+.about ul { margin:4px 0 0; padding-left:1.2em; } .about li { margin-bottom:6px; }
+.about b { color:var(--fg); }
+.tagv, .tagu { font-size:.7rem; border-radius:10px; padding:0 7px; margin-left:4px; border:1px solid var(--line); }
+.tagv { color:var(--ok); border-color:var(--ok); } .tagu { color:var(--muted); }
+
+/* code view */
+.codehead { display:grid; grid-template-columns:1fr auto 1fr; gap:10px; align-items:center; margin-bottom:8px; }
+.codehead h2 { margin:0; }
+.copts { justify-self:end; display:flex; gap:14px; flex-wrap:wrap; }
+.colorbox { display:flex; align-items:center; gap:5px; font-size:.85rem; color:var(--muted); cursor:pointer; }
+@media (max-width:640px) { .codehead { grid-template-columns:1fr; } .copts { justify-self:start; } }
+.ctabs { display:flex; gap:6px; flex-wrap:wrap; margin-bottom:8px; }
+.ctabs button { font:inherit; font-family:var(--mono); font-size:.8rem; padding:3px 9px; border:1px solid var(--line); background:var(--panel); color:var(--fg); border-radius:12px; cursor:pointer; }
+.ctabs button[aria-pressed="true"] { background:var(--accent); color:var(--accent-fg); border-color:var(--accent); }
+.cmsg { font-size:.78rem; color:var(--muted); } .cmsg:not(:empty) { margin-bottom:6px; }
+
+pre.code { position:relative; margin:0; padding:0; background:var(--bg); border:1px solid var(--line); border-radius:6px; font-family:var(--mono); font-size:.8rem; line-height:1.45; overflow:auto; max-height:72vh; overflow-anchor:none; --cw:16px; }
+pre.code .ln { display:block; padding:0 12px 0 0; white-space:pre; }
+pre.code .ln i { display:inline-block; width:4.2em; text-align:right; color:var(--muted); font-style:normal; margin-right:12px; user-select:none; }
+pre.code .ln.hit { background:var(--on); }
+:root { --g0:#8aa0a6; --g1:#6f9bd1; --g2:#c58bd6; --g3:#d9a85a; --red:#d33a3a; --green:#1f9d4c; --dia:#44575d; --diabg:#ffffff; }
+@media (prefers-color-scheme: dark) { :root:not([data-theme="light"]) { --g0:#6c8389; --g1:#5b86b8; --g2:#a874b8; --g3:#b98d45; --red:#f06a6a; --green:#4cc473; --dia:#b5c4c9; --diabg:#1b2427; } }
+.ftipbox { position:fixed; z-index:60; max-width:340px; padding:6px 9px; font:.78rem/1.4 system-ui,-apple-system,Segoe UI,Roboto,sans-serif; color:var(--fg); background:var(--panel); border:1px solid var(--line); border-radius:6px; box-shadow:0 3px 10px rgba(0,0,0,.2); pointer-events:none; }
+.foldhelp { font-size:.8rem; color:var(--muted); margin:0 0 6px; line-height:1.6; }
+.foldhelp[hidden] { display:none; }
+.foldhelp svg { vertical-align:-3px; } .foldhelp b { color:var(--fg); font-weight:600; }
+body.touch pre.code { --cw:24px; }
+pre.code .ln b.g { display:inline-block; position:relative; width:calc(var(--gn, 1) * var(--cw)); height:1.45em; vertical-align:top; font-weight:400; }
+pre.code .ln b.v { position:absolute; top:0; bottom:0; left:calc(var(--c) * var(--cw) + var(--cw) / 2 - .5px); width:1px; background:var(--g0); }
+pre.code .ln b.v.c1 { background:var(--g1); } pre.code .ln b.v.c2 { background:var(--g2); } pre.code .ln b.v.c3 { background:var(--g3); }
+pre.code .dia { all:unset; position:absolute; top:0; left:calc(var(--c) * var(--cw)); width:var(--cw); height:100%; display:flex; align-items:center; justify-content:center; cursor:pointer; user-select:none; -webkit-user-select:none; -webkit-touch-callout:none; touch-action:manipulation; z-index:1; }
+pre.code .dia svg { display:block; overflow:visible; }
+pre.code .dia:focus-visible svg { outline:2px solid var(--accent); outline-offset:2px; border-radius:3px; }
+pre.code .dia:hover svg path { stroke-width:1.8; }
+body.touch pre.code .dia svg { width:19px; height:19px; }
+pre.code .sp { display:block; height:10px; }
+pre.code .fnbar { position:sticky; top:0; left:0; height:0; z-index:3; display:block; }
+pre.code .fnbar .fb { position:absolute; left:0; right:0; top:0; height:1.45em; display:none; background:var(--panel); border-bottom:1px solid var(--line); box-shadow:0 2px 5px rgba(0,0,0,.12); white-space:pre; overflow:hidden; }
+pre.code .fnbar.on .fb { display:block; }
+pre.code .cb { display:inline-block; vertical-align:top; }
+pre.code .fx { font-family:var(--mono); font-style:normal; user-select:none; -webkit-user-select:none; }
+pre.code .fx .ell { color:var(--muted); font-style:italic; font-size:.92em; margin-left:8px; }
+pre.code .fnbar .goto { all:unset; cursor:pointer; margin-left:12px; font:600 .78em system-ui,-apple-system,Segoe UI,Roboto,sans-serif; color:var(--accent-fg); background:var(--accent); border-radius:9px; padding:0 9px; line-height:1.5; vertical-align:1px; }
+pre.code .fnbar .goto:hover { filter:brightness(1.12); } pre.code .fnbar .goto:focus-visible { outline:2px solid var(--accent); outline-offset:2px; }
+pre.code .fx .lvl { margin-left:12px; font-size:.86em; color:var(--muted); background:var(--bg); border:1px solid var(--line); border-radius:9px; padding:0 7px; }
+pre.code .fx .toast { margin-left:10px; font-weight:600; font-size:.88em; color:var(--accent-fg); background:var(--accent); border-radius:9px; padding:1px 8px; animation:ftoast 2.2s ease-out forwards; }
+pre.code .fx .pop { margin-left:14px; font:inherit; font-size:.85em; padding:0 2px; color:var(--fg); background:var(--panel); border:1px solid var(--line); border-radius:4px; }
+@keyframes ftoast { 0%,70% { opacity:1; } 100% { opacity:0; } }
+pre.code .ln.flash { animation:fflash 1.1s ease-out; }
+@keyframes fflash { 0% { background:var(--on); } 100% { background:transparent; } }
+@media (prefers-reduced-motion: reduce) { pre.code .fx .toast, pre.code .ln.flash { animation:none; } }
+
+pre.code .cm { color:var(--cm); } pre.code .st { color:var(--st); } pre.code .vr { color:var(--var); } pre.code .kw { color:var(--k-mac); font-weight:600; } pre.code .fn { color:var(--k-fn); font-weight:700; }
+pre.code.nocolor .cm, pre.code.nocolor .st, pre.code.nocolor .vr, pre.code.nocolor .kw, pre.code.nocolor .fn { color:inherit; font-weight:400; }
+pre.code mark.sym { background:var(--pc); color:inherit; border-radius:2px; box-shadow:0 0 0 1px var(--pc-b); }
+pre.code mark.sym.cur { background:var(--pc-b); color:#111; box-shadow:0 0 0 2px var(--pc-b); }
+.symbar { display:flex; flex-wrap:wrap; align-items:center; gap:8px; margin:0 0 8px; padding:6px 10px; border:1px solid var(--pc-b); background:var(--pc); border-radius:8px; font-size:.85rem; }
+.symbar[hidden], #codeview[hidden], .review[hidden] { display:none; }
+.symbar code { font-weight:700; } .symbar .sp2 { flex:1; }
+.cnote { color:var(--muted); font-size:.85rem; margin-top:8px; }
+#selfcheck { font-family:var(--mono); font-size:.75rem; color:var(--muted); }
+@media (prefers-reduced-motion: reduce) { .lay.new, .win.fresh, pre.code .ln.flash { animation:none; } }
+</style>
+</head>
+<body>
+<main>
+  <header class="top">
+    <div class="topl">
+      <p class="ver mono">Version 1.5 &middot; Oct 29, 2026</p>
+      <h1>Tk Console on Unix: <span>Channel Transform Stepper</span></h1>
+      <p class="lede">TIP 561 adds the <code>console</code> command to Unix. Follow a <code>puts</code> containing a <code>\u21a9</code> escape from the script, through the channel's encoding and the transform's <code>write</code> method, to the text widget in the console window. Pick a script below: the first shows how <code>tclIndex</code> brings the command into existence; the others show output going to the terminal, then to the console, and back.</p>
+    </div>
+    <div class="keycol"><div class="keys" aria-label="keyboard and mouse shortcuts"><b>Shortcuts</b>
+      <div><kbd>&rarr;</kbd> next step <kbd>&larr;</kbd> back</div>
+      <div><kbd>Space</kbd> start / pause auto-play</div>
+      <div><kbd>Esc</kbd> clear the highlighted name, or close the code view</div>
+      <div>code view: fold squares &mdash; click opens a level, right-click closes one, double-click opens or closes all</div>
+      <div>code view: double-click a name to highlight it in its proc, or to jump if it is a proc; <kbd>n</kbd> / <kbd>N</kbd> next / previous match; double-click the jumped-to name again, or blank space, or press <kbd>&#9003;</kbd>, to go back</div>
+    </div>
+    <label class="tipline"><input type="checkbox" id="tipOn2" checked> Tooltips</label></div>
+  </header>
+
+  <div class="bar">
+    <div><span class="lbl">Script</span><div class="seg" id="scenSeg" role="group" aria-label="Scenario"></div></div>
+    <div id="decBox"><span class="lbl" title="What the transform's write method does with the bytes it receives. The first is the code in consolecmd.impl; the second simulates the wiki code, which had no decode step, so you can see why the line is there.">Decoding in <code>write</code></span><div class="seg" id="decSeg" role="group" aria-label="Decoding in write"></div></div>
+  </div>
+
+  <div class="srcbox">
+    <span class="lbl" id="srclbl">Command being run</span>
+    <div class="src" id="src" aria-label="The command text"></div>
+    <div class="srcnote" id="srcnote"></div>
+  </div>
+
+  <div class="bar">
+    <div class="steps" id="dots" role="group" aria-label="Steps: click one to go to it"></div>
+    <div class="ctl">
+      <button id="b-reset">Reset</button>
+      <button id="b-prev">Back</button>
+      <button id="b-next" class="primary">Next step</button>
+      <select id="speed" title="Seconds per step during Auto-play" aria-label="Seconds per step"><option>0.5</option><option>1</option><option selected>1.5</option><option>2</option><option>3</option><option>5</option></select><span class="spd">s/step</span>
+      <button id="b-play">Auto-play</button>
+      <label class="allbox" title="Auto-play carries on from one script to the next"><input type="checkbox" id="playall"> all</label>
+      <button id="b-code">Show code</button>
+    </div>
+  </div>
+
+  <section class="pane" id="codeview" hidden>
+    <div class="codehead"><h2 id="code-h">Code for this step</h2><div><button class="bkbtn" id="b-back">&larr; Back</button></div>
+      <div class="copts"><label class="colorbox" title="colour comments, strings, variables and Tcl commands"><input type="checkbox" id="colorOn" checked> Color</label><label class="colorbox" title="show the fold squares: click opens a level, right-click closes one, double-click opens or closes all. Unticked, the code is fully open with no squares or guide lines"><input type="checkbox" id="foldOn" checked> Fold</label><label class="colorbox" title="show a short explanation when the pointer rests on a control"><input type="checkbox" id="tipOn" checked> Tooltips</label></div></div>
+    <div class="ctabs" id="ctabs"></div><div id="cmsg" class="cmsg"></div>
+    <div class="foldhelp" id="foldhelp" hidden></div>
+    <div class="symbar" id="symbar" hidden></div>
+    <pre class="code" id="codepre" tabindex="0"></pre>
+    <p class="cnote" id="cnote"></p>
+  </section>
+
+  <div id="walk" style="display:flex;flex-direction:column;gap:14px">
+  <div class="panes">
+    <section class="pane">
+      <h2 id="codeTitle">Code <small id="codeFile"></small></h2>
+      <div class="mini" id="mini" tabindex="0"></div>
+      <div class="hintline">Click the code to open the full file with folding.</div>
+    </section>
+    <section class="pane">
+      <h2>Channel stacks <small>what the Tcl channel layer looks like now</small></h2>
+      <div class="stacks" id="stacks"></div>
+      <div class="kv" id="kv"></div>
+    </section>
+  </div>
+
+  <section class="pane">
+    <h2 id="flTitle">The value in hand <small id="flSub"></small></h2>
+    <div class="fl" id="fl"></div>
+  </section>
+
+  <div class="shows">
+    <section><span class="lbl">The terminal you started <code>wish</code> from</span><div id="term"></div></section>
+    <section><span class="lbl">The console window (a separate Tk interpreter)</span><div id="con"></div></section>
+  </div>
+
+  <div class="caption" aria-live="polite">
+    <div class="top" id="cap-top"></div>
+    <h2 id="cap-h"></h2>
+    <div id="cap-p"></div>
+  </div>
+  </div>
+
+  <section class="about">
+    <h2>Notes for reviewers</h2>
+    <p>Everything on this page is taken from <code>consolecmd.tcl</code> and <code>consolecmd.impl</code> in the <code>tcl-console-unix</code> repository (the same code as the <code>tip-561-revised</code> branch), run under Tcl/Tk 8.6.14 on Linux. The bytes and characters in the cells were measured by running that code with a probe on the transform's <code>write</code>; the page's self-check (<code>?check=1</code>) recomputes them in the browser. The Tcl core steps (substitution, <code>unknown</code>, the channel\u2019s encoding step) are not in these files; the page describes them and says so.</p>
+    <ul>
+      <li><b>Locale.</b> <span class="tagv">measured</span> The decode line asks the channel which encoding it uses. In a UTF-8 locale that is right. With <code>LANG=C</code> on Tcl 8.6.14, <code>fconfigure stdout -encoding</code> reports <code>iso8859-1</code> while the transform still receives UTF-8 bytes, so <code>\u21a9</code> arrives in the widget as U+00E2 U+0086 U+00A9. The same code under <code>C.UTF-8</code> shows the arrow. Worth checking on the Tcl 9.x target.</li>
+      <li><b>Interpreter gone.</b> <span class="tagv">measured</span> If the console interpreter is deleted while the transforms are still pushed, the next <code>puts</code> fails with <code>console closed</code> (the error branch in <code>write</code>) instead of printing anywhere.</li>
+      <li><b>Hide versus close.</b> <span class="tagu">read from the code</span> <code>console hide</code> pops the transforms and puts back the saved encodings; the window's close button runs <code>Oc_RestorePuts</code>, which pops them but does not restore encodings. Not tested.</li>
+      <li><b>Input.</b> Only output is redirected. Stdin still comes from the terminal and the console accepts commands too, which is the question raised in the TIP discussion.</li>
+    </ul>
+    <p id="selfcheck"></p>
+  </section>
+</main>
+<div class="ftipbox" id="ftip" hidden></div>
+
+<script type="text/plain" id="src-tclIndex">
+# Tcl autoload index file, version 2.0
+# This file is generated by the "auto_mkindex" command
+# and sourced to set up indexing information for one or
+# more commands.  Typically each line is a command that
+set auto_index(console) [list source [file join $dir consolecmd.tcl]]
+</script>
+<script type="text/plain" id="src-stub">
+# consolecmd.tcl
+#
+# Lightweight stub, safe for auto_mkindex to source directly - it creates
+# a namespace, sets one variable, and defines one proc. No interpreter
+# creation, no Tk load, no window, no real side effects - just enough
+# state so the proc knows where to find the real implementation once it's
+# actually called.
+#
+# On first call, loads the real implementation (consolecmd.impl, given a
+# non-.tcl extension deliberately so auto_mkindex's default *.tcl scan
+# never sources it directly) and forwards the original call to it.
+
+namespace eval ::tk::console {}
+set ::tk::console::stubdir [file dirname [info script]]
+
+proc console {args} {
+    rename console {}
+    uplevel #0 [list source [file join $::tk::console::stubdir consolecmd.impl]]
+    tailcall console {*}$args
+}
+</script>
+<script type="text/plain" id="src-impl">
+# FILE: consolecmd.impl
+#
+#       Provides a console window.
+#
+# Last modified on: $Date: 2005-10-15 06:00:15 $
+# Last modified by: $Author: jcw $
+#
+# This file is evaluated to provide a console window interface to the
+# root Tcl interpreter of an OOMMF application.  It calls on a script
+# included with the Tk script library to do most of the work, making use
+# of Tk interface details which are only semi-public.  For this reason,
+# there is some risk that future versions of Tk will no longer support
+# this script.  That is why this script has been isolated in a file of
+# its own.
+ 
+########################################################################
+# If the Tcl command 'console' is already in the interpreter, our work
+# is done.
+########################################################################
+if {[llength [info commands console]]} {
+    # console is already a native command on this platform (Windows/Mac) -
+    # do nothing and leave it alone.
+    return
+}
+ 
+########################################################################
+# Check Tcl/Tk support
+########################################################################
+package require Tcl 8.6-
+package require Tk 8.6-
+
+if {![file readable [file join $::tk_library console.tcl]]} {
+    return -code error "File not readable: [file join $::tk_library console.tcl]"
+}
+
+########################################################################
+# Provide the support which the Tk library script console.tcl assumes
+########################################################################
+# ConsoleSetup and ConsoleSetupFinish (defined further below) together
+# do all of the following at most once, the first time any console
+# subcommand is actually invoked (see the "console" proc below) - not
+# unconditionally at file-load/source time. This keeps the file itself
+# inert when merely sourced or scanned (e.g. by auto_mkindex), the same
+# property Schelte's tip-561-autoload branch has by a similar design.
+proc ConsoleSetup {} {
+    if {[info exists ::tk::console::interp] \
+            && [interp exists $::tk::console::interp]} {
+        # Already set up - nothing to do.
+        return
+    }
+
+# 1. Create an interpreter for the console window widget and load Tk
+# Ensure the ::tk::console namespace exists before setting a variable
+# inside it - a bare "set" on a fully-qualified name requires every
+# namespace in the path to already exist (unlike proc/namespace eval,
+# it doesn't auto-create parent namespaces).
+namespace eval ::tk::console {}
+
+set ::tk::console::interp [interp create]
+$::tk::console::interp eval [list set tk_library $::tk_library]
+$::tk::console::interp alias exit exit
+load "" Tk $::tk::console::interp
+
+# Withdraw immediately, before anything else runs. Tk's initial map of a
+# new toplevel is a deferred idle-time task, not immediate - withdrawing
+# later (e.g. after sourcing console.tcl) can race against that pending
+# task and fail to prevent the window flashing visible. Withdrawing here,
+# before any event-loop activity has a chance to process that task, is
+# the reliable way to keep it hidden until "console show" is called.
+$::tk::console::interp eval {wm withdraw .}
+
+    ConsoleSetupFinish
+}
+
+# 2. A command 'console' in the application interpreter
+proc console {{sub ""} args} {
+    if {$sub ni {hide show title eval}} {
+        error "bad option \"$sub\": should be hide, show, title, or eval"
+    }
+    ConsoleSetup
+    upvar #0 ::tk::console::interp consoleInterp
+    switch -exact -- $sub {
+        title {
+            if {[llength $args] > 1} {
+                error "wrong # args: should be \"console title ?title?\""
+            } elseif {[llength $args]} {
+                $consoleInterp eval wm title . [list [lindex $args 0]]
+            } else {
+                return [$consoleInterp eval wm title .]
+            }
+        }
+        hide {
+            $consoleInterp eval wm withdraw .
+            # Pop transforms when hiding
+            if {$::tkConsoleOut::pushed} {
+                catch {chan pop stdout}
+                catch {chan pop stderr}
+                catch {fconfigure stdout -encoding $::tkConsoleOut::stdoutEncoding}
+                catch {fconfigure stderr -encoding $::tkConsoleOut::stderrEncoding}
+                set ::tkConsoleOut::pushed 0
+            }
+            return "" ;# avoid output of 0
+        }
+        show {
+            $consoleInterp eval wm deiconify .
+            # Only push transforms if not already active - chan push
+            # always succeeds even if already pushed, so pushing again
+            # here would stack a second transform layer, and a single
+            # chan pop on close would then leave one layer behind,
+            # silently redirecting output into the now-hidden console.
+            if {!$::tkConsoleOut::pushed} {
+                # Save the real original encodings before pushing, so we
+                # can restore what was actually there - not assume utf-8,
+                # which is wrong on platforms/terminals using a different
+                # encoding (e.g. Windows console's default codepage).
+                set ::tkConsoleOut::stdoutEncoding [fconfigure stdout -encoding]
+                set ::tkConsoleOut::stderrEncoding [fconfigure stderr -encoding]
+                chan push stdout {::tkConsoleOut stdout}
+                chan push stderr {::tkConsoleOut stderr}
+                set ::tkConsoleOut::pushed 1
+            }
+            return ""
+        }
+        eval {
+            if {[llength $args] != 1} {
+                error "wrong # args: should be \"console eval script\""
+            }
+            $consoleInterp eval [lindex $args 0]
+        }
+    }
+}
+# 3. Alias a command 'consoleinterp' in the console window interpreter
+#       to cause evaluation of the command 'consoleinterp' in the
+#       application interpreter.
+;proc consoleinterp {sub cmd} {
+    switch -exact -- $sub {
+        eval {
+            uplevel #0 $cmd
+        }
+        record {
+            history add $cmd
+            catch {uplevel #0 $cmd} retval
+            return $retval
+        }
+        default {
+            error "bad option \"$sub\": should be eval or record"
+        }
+    }
+}
+
+namespace eval tkConsoleOut {
+        variable consoleInterp {}
+        variable pushed 0
+        variable stdoutEncoding {}
+        variable stderrEncoding {}
+        proc initialize {what x mode}    {
+            fconfigure $what -buffering none
+            return {initialize finalize write flush}
+        }
+        proc finalize {what x}  { }
+        proc write {what x data}  { 
+            variable consoleInterp
+            set consoleInterp $::tk::console::interp
+            # Check if interpreter still exists
+            if {[interp exists $consoleInterp]} {
+                # Get the channel's actual encoding instead of hardcoding UTF-8
+                set enc [fconfigure $what -encoding]
+                if {$enc ne "binary"} {
+                    set data [encoding convertfrom $enc $data]
+                }
+                set data [string map {\r ""} $data]
+                $consoleInterp eval [list ::tk::ConsoleOutput $what $data]
+            } else {
+                # Interpreter gone - pass data through to terminal
+                return -code error "console closed"
+            }
+            return ""
+        }
+    proc flush {what x}              { }
+    namespace export {[a-z]*}
+    namespace ensemble create -parameters what
+}
+
+# Restore normal output if console widget goes away...
+proc Oc_RestorePuts {slave} {
+    # Pop the transforms to restore normal output
+    catch {chan pop stdout}
+    catch {chan pop stderr}
+    set ::tkConsoleOut::pushed 0
+
+    # Notify user
+    puts stderr "\n=== Console closed: output restored to terminal ==="
+    flush stderr
+}
+
+# ConsoleSetupFinish - called once from ConsoleSetup above, once the
+# interp/Tk-load part is done. Split out so "console" (which needs
+# ConsoleSetup already defined) could stay near its original position -
+# Tcl only cares about call order between procs, not definition order,
+# so ConsoleSetup can call this even though it's defined later in the
+# file.
+proc ConsoleSetupFinish {} {
+$::tk::console::interp alias consoleinterp consoleinterp
+
+# 4. Bind the <Destroy> event of the application interpreter's main
+#    window to kill the console (via ::tk::ConsoleExit)
+bind . <Destroy> [list +if {[string match . %W]} [list catch \
+        [list $::tk::console::interp eval ::tk::ConsoleExit]]]
+
+# 5. Redirect stdout/stderr messages to the console using TIP#230 channel
+#    transforms.
+# (tkConsoleOut namespace/procs are defined once, unconditionally, below -
+#  see note after this proc. Only the interp/binding setup needs to be
+#  deferred; defining procs has no side effects worth guarding.)
+
+# Transforms are pushed lazily on first "console show" (see the console
+# proc above) rather than unconditionally here, so that loading the
+# module has no visible side effects until explicitly requested.
+
+# 6. No matter what Tk_Main says, insist that this is an interactive  shell
+set ::tcl_interactive 1
+
+########################################################################
+# Evaluate the Tk library script console.tcl in the console interpreter
+########################################################################
+$::tk::console::interp eval source [list [file join $::tk_library console.tcl]]
+$::tk::console::interp alias Oc_RestorePuts Oc_RestorePuts $::tk::console::interp
+$::tk::console::interp eval {
+    # Use WM_DELETE_WINDOW protocol to catch console close before destruction
+    wm protocol . WM_DELETE_WINDOW {
+        Oc_RestorePuts
+        wm withdraw .
+    }
+}
+
+# Start hidden regardless of console.tcl's own tcl_interactive check -
+# nothing should be visible or redirected until "console show" is
+# explicitly called.
+$::tk::console::interp eval {wm withdraw .}
+
+# addition by Schelte Bron ([sbron]):
+# Allow functional pasting with the middle mouse button
+catch {
+    # on particularly old Tk versions, virtual events might not be present?
+    # FIXME: this should be guarded with an appropriate version test
+    $::tk::console::interp eval {
+        bind Console <<PasteSelection>> {
+            if {$tk_strictMotif || ![info exists tk::Priv(mouseMoved)] \
+            || !$tk::Priv(mouseMoved)} {
+                catch {
+                    set clip [::tk::GetSelection %W PRIMARY]
+                    set list [split $clip \n\r]
+                    tk::ConsoleInsert %W [lindex $list 0]
+                    foreach x [lrange $list 1 end] {
+                        %W mark set insert {end - 1c}
+                        tk::ConsoleInsert %W "\n"
+                        tk::ConsoleInvoke
+                        tk::ConsoleInsert %W $x
+                    }
+                }
+            }
+        }
+    }
+}
+$::tk::console::interp eval {
+    bind Console <Control-equal> {event generate .console <Control-plus>}
+    bind Console <Control-KP_Add> {event generate .console <Control-plus>}
+    bind Console <Control-KP_Subtract> {event generate .console <Control-minus>}
+}
+
+# ::tk::console::interp is intentionally left set here - unlike the old
+# baked-in version, this console proc does a live lookup on every call,
+# so it needs this variable to still exist for the lifetime of the
+# application, not just during initial setup. It's namespaced under
+# ::tk::console:: rather than left as a bare global, since it now has to
+# persist for the whole program instead of being unset right after setup.
+
+# Set the initial title directly (not via the public "console" command,
+# to avoid re-entering ConsoleSetup while it's still running).
+$::tk::console::interp eval [list wm title . "[wm title .] Console"]
+}
+
+</script>
+<script type="text/plain" id="src-tkout">
+# ::tk::ConsoleOutput --
+#
+# This routine is called directly by ConsolePutsCmd to cause a string
+# to be displayed in the console.
+#
+# Arguments:
+# dest -	The output tag to be used: either "stderr" or "stdout".
+# string -	The string to be displayed.
+
+proc ::tk::ConsoleOutput {dest string} {
+    set w .console
+    $w insert output $string $dest
+    ::tk::console::ConstrainBuffer $w $::tk::console::maxLines
+    $w see insert
+}
+</script>
+
+
+<script>
+(function () {
+'use strict';
+var $ = function (id) { return document.getElementById(id); };
+var esc = function (s) { return s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;'); };
+var hex2 = function (n) { return n.toString(16).toUpperCase().padStart(2, '0'); };
+var hex4 = function (n) { return n.toString(16).toUpperCase().padStart(4, '0'); };
+var vis = function (s) { return esc(s).replace(/[\u0080-\u009f]/g, function (m) { return '<span class="ctl-ch" title="U+' + hex4(m.charCodeAt(0)) + ' is an invisible control character">&#9647;</span>'; }); };
+
+/* ---------- embedded sources ---------- */
+var FILES = {
+  tclIndex: { label: 'tclIndex', full: 'tk/library/tclIndex', note: 'The header comment is the standard auto_mkindex one; the last line is the one line TIP 561 adds.' },
+  stub:     { label: 'consolecmd.tcl', full: 'tk/library/consolecmd.tcl', note: 'New file in TIP 561: a stub small enough for auto_mkindex to source safely.' },
+  impl:     { label: 'consolecmd.impl', full: 'tk/library/consolecmd.impl', note: 'New file in TIP 561: the real implementation, loaded on the first call.' },
+  tkout:    { label: 'console.tcl (excerpt)', full: 'tk/library/console.tcl', note: 'Tk\u2019s own console script, not changed by the TIP. Only ConsoleOutput is shown here (from Tk 8.6.14).' }
+};
+var ORDER = ['tclIndex', 'stub', 'impl', 'tkout'];
+var LINES = {};
+ORDER.forEach(function (k) { LINES[k] = $('src-' + k).textContent.replace(/^\n/, '').replace(/\n$/, '').split('\n'); });
+var bad = [];
+
+/* find a range: anchors are searched in order, each after the one before; n is a line count or an end anchor */
+function R(f, anch, n) {
+  anch = [].concat(anch); var from = 0, hit = -1;
+  for (var i = 0; i < anch.length; i++) {
+    var k = from;
+    while (k < LINES[f].length && LINES[f][k].indexOf(anch[i]) < 0) k++;
+    if (k >= LINES[f].length) { bad.push(f + ': ' + anch[i]); return { f: f, s: 1, e: 1 }; }
+    hit = k; from = k + 1;
+  }
+  var e = hit;
+  if (typeof n === 'string') {
+    var starts = n.charAt(0) === '^', key = starts ? n.slice(1) : n, q = hit + (starts ? 1 : 0);
+    while (q < LINES[f].length && (starts ? LINES[f][q].indexOf(key) !== 0 : LINES[f][q].indexOf(key) < 0)) q++;
+    if (q >= LINES[f].length) { bad.push(f + ': end ' + n); } else e = q;
+  } else e = hit + (n || 1) - 1;
+  return { f: f, s: hit + 1, e: e + 1 };
+}
+
+/* ---------- encodings (only what the demo needs) ---------- */
+function encodeStr(s, enc) {
+  if (enc === 'utf-8') return Array.prototype.slice.call(new TextEncoder().encode(s));
+  if (enc === 'iso8859-15') return Array.prototype.map.call(s, function (c) { return c === '\u20ac' ? 0xA4 : c.charCodeAt(0) & 255; });
+  throw new Error('enc ' + enc);
+}
+function decodeBytes(arr, enc) {
+  if (enc === 'utf-8') { try { return new TextDecoder('utf-8', { fatal: true }).decode(new Uint8Array(arr)); } catch (e) { return String.fromCharCode.apply(null, arr); } }
+  if (enc === 'iso8859-15') return arr.map(function (b) { return b === 0xA4 ? '\u20ac' : String.fromCharCode(b); }).join('');
+  throw new Error('enc ' + enc);
+}
+function decodeVia(mode, enc, arr) {
+  if (mode === 'none') return String.fromCharCode.apply(null, arr);
+  return decodeBytes(arr, enc);
+}
+
+/* ---------- cells for the "value in hand" pane ---------- */
+function charCells(str, grp, cls) {
+  return Array.prototype.map.call(str, function (c, i) {
+    var cp = c.charCodeAt(0), ctl = cp < 0x20 || (cp >= 0x7f && cp < 0xa0);
+    return { g: ctl ? '\u00b7' : (c === ' ' ? '\u2423' : c), s: 'U+' + hex4(cp), k: grp && grp.indexOf(i) >= 0 ? cls || 'g1' : '' };
+  });
+}
+function byteCells(arr, grp, cls) {
+  return arr.map(function (b, i) {
+    var ctl = b < 0x20 || (b >= 0x7f && b < 0xa0);
+    return { g: hex2(b), s: ctl ? '\u00b7' : (b === 32 ? '\u2423' : String.fromCharCode(b)), k: grp && grp.indexOf(i) >= 0 ? cls || 'g1' : '' };
+  });
+}
+function range(a, b) { var o = []; for (var i = a; i <= b; i++) o.push(i); return o; }
+
+/* ---------- terminal and console text ---------- */
+function T(s, c) { return [s, c || '']; }
+var PROMPT_T = '% ';
+function cp(lines) { return lines.map(function (l) { return l.slice(); }); }
+
+/* ---------- scenarios ---------- */
+var O = { dec: 'cur' };
+var SC = [];
+
+function baseStacks(pushed) { return { stdout: { tr: pushed }, stderr: { tr: pushed } }; }
+function termInit() { return [[T('$ ', 'p'), T('wish')], [T('% ', 'p')]]; }
+function termAfterShow() { return [[T('$ ', 'p'), T('wish')], [T('% ', 'p'), T('console show')], [T('% ', 'p')]]; }
+function addTyped(lines, txt) { var l = lines[lines.length - 1]; l.push(T(txt, 't')); }
+function newPrompt(lines, p) { lines.push([T(p, 'p')]); }
+
+/* 1. console show: the first call */
+SC.push(function () {
+  var script = 'console show';
+  var st = [];
+  function S(title, text, o) { o = o || {}; o.title = title; o.text = text; st.push(o); return o; }
+  S('console show at the wish prompt',
+    ['On Unix there is no command called <code>console</code>, so this line would normally end in an error. With TIP 561 it works because Tk\u2019s library has a <code>tclIndex</code> entry for it. Nothing about the console exists yet: no interpreter, no window, no transform.', 'Watch the right-hand panes: <b>stdout</b> and <b>stderr</b> go straight to the terminal, and they will not change until the very end of this script.'],
+    { hl: ['console show', 'cur'], where: 'terminal', set: function (s) { addTyped(s.term, 'console show'); s.kv.autoload = 'not yet'; } });
+  S('Tcl finds no such command',
+    ['The interpreter looks for a command named <code>console</code> and does not find one, so it calls <code>unknown</code>. That procedure comes from Tcl\u2019s <code>init.tcl</code>; before reporting an error it tries autoloading.'],
+    { nocode: 'Tcl core: init.tcl\u2019s <code>unknown</code> procedure. Not part of this TIP.', hl: ['console', 'cur'] });
+  S('auto_load looks in the index',
+    ['Autoloading consults the <code>auto_index</code> array. Tk puts its library directory on <code>auto_path</code>, and the <code>tclIndex</code> file there fills in <code>auto_index</code>. TIP 561 adds one line to that file: <code>console</code> maps to a script that sources <code>consolecmd.tcl</code>.'],
+    { code: [R('tclIndex', 'set auto_index(console)', 1)], hl: ['console', 'cur'], set: function (s) { s.kv.autoload = 'index hit'; } });
+  S('The stub is sourced',
+    ['<code>unknown</code> evaluates the index entry, which sources <code>consolecmd.tcl</code>. The file creates a namespace, records the directory it came from, and defines one small procedure named <code>console</code>.', 'That is all. It creates no interpreter, loads no Tk and opens no window, which is what makes it safe for <code>auto_mkindex</code> to source when the index is built.'],
+    { code: [R('stub', 'namespace eval ::tk::console {}', 1), R('stub', 'set ::tk::console::stubdir', 1), R('stub', 'proc console {args} {', '^}')], hl: ['console', 'cur'], set: function (s) { s.kv.console = 'stub proc'; } });
+  S('unknown retries the command',
+    ['A real <code>console</code> command now exists, so <code>unknown</code> runs <code>console show</code> again. The stub\u2019s first action is <code>rename console {}</code>: it deletes itself. The reason shows up two steps from now.'],
+    { code: [R('stub', 'rename console {}', 1)], hl: ['console show', 'cur'], set: function (s) { s.kv.console = 'none (stub renamed away)'; } });
+  S('Load the real implementation',
+    ['The stub sources <code>consolecmd.impl</code> at global level with <code>uplevel #0</code>. The file has the extension <code>.impl</code> deliberately: <code>auto_mkindex</code> scans <code>*.tcl</code>, and this file does real work (it creates an interpreter and loads Tk) as soon as it is sourced, so it must never be sourced by a scan.'],
+    { code: [R('stub', 'uplevel #0 [list source', 1)] });
+  S('Guard and requirements',
+    ['The implementation opens with a guard: if a <code>console</code> command already exists (Windows and macOS have one built in) it returns and does nothing. That is why the stub renamed itself first. On Unix there is no <code>console</code> now, so the file carries on.', 'It then requires Tcl and Tk 8.6 or later and checks that Tk\u2019s own <code>console.tcl</code> is readable.'],
+    { code: [R('impl', 'if {[llength [info commands console]]} {', '^}'), R('impl', 'package require Tcl 8.6-', 6)], set: function (s) { s.kv.console = 'none, guard passes'; } });
+  S('Define procedures, run nothing',
+    ['The rest of the file only defines things: <code>ConsoleSetup</code>, the real <code>console</code> procedure, <code>consoleinterp</code>, the <code>tkConsoleOut</code> namespace that is the transform, <code>Oc_RestorePuts</code> and <code>ConsoleSetupFinish</code>.', 'Still no interpreter and no window, and the channels are untouched. Merely sourcing the file has no visible effect.'],
+    { code: [R('impl', 'proc ConsoleSetup {} {', 1), R('impl', 'proc console {{sub ""} args} {', 1), R('impl', 'namespace eval tkConsoleOut {', 1), R('impl', 'proc Oc_RestorePuts {slave} {', 1)], set: function (s) { s.kv.console = 'real proc defined'; s.kv.pushed = '0 (namespace tkConsoleOut exists)'; } });
+  S('tailcall into the real command',
+    ['Back in the stub, <code>tailcall console {*}$args</code> replaces the stub\u2019s own stack frame with a call to <code>console show</code>. The name now refers to the real procedure from the implementation file.'],
+    { code: [R('stub', 'tailcall console', 1)], hl: ['console show', 'cur'] });
+  S('Check the subcommand, then set up',
+    ['The real <code>console</code> accepts <code>hide</code>, <code>show</code>, <code>title</code> and <code>eval</code>, and rejects anything else. Then, before looking at the subcommand, it calls <code>ConsoleSetup</code>. That procedure does its work only once; a second call finds the interpreter already there and returns.'],
+    { code: [R('impl', ['proc console {{sub ""} args} {', 'if {$sub ni'], 3), R('impl', ['proc console {{sub ""} args} {', '    ConsoleSetup'], 1)] });
+  S('A hidden interpreter with Tk',
+    ['<code>ConsoleSetup</code> creates a second interpreter just for the console, gives it the library path and an alias for <code>exit</code>, loads Tk into it, and withdraws its main window immediately. Tk maps a new toplevel from an idle task, so withdrawing before anything else runs is what stops the window flashing on screen.'],
+    { code: [R('impl', 'set ::tk::console::interp [interp create]', '$::tk::console::interp eval {wm withdraw .}')],
+      set: function (s) { s.con.vis = 'hidden'; s.kv.interp = 'interp0 (Tk loaded, withdrawn)'; } });
+  S('Finish the console interpreter',
+    ['<code>ConsoleSetupFinish</code> sources Tk\u2019s <code>console.tcl</code> into that interpreter. That is the text widget, menus and key bindings, the same unmodified script Windows and macOS use. It adds the <code>consoleinterp</code> and <code>Oc_RestorePuts</code> aliases so the console can call back into the application, binds the main window\u2019s <code>&lt;Destroy&gt;</code>, and installs a <code>WM_DELETE_WINDOW</code> handler for the close button.'],
+    { code: [R('impl', 'proc ConsoleSetupFinish {} {', 2), R('impl', 'bind . <Destroy>', 2), R('impl', '$::tk::console::interp eval source [list [file join $::tk_library console.tcl]]', 2), R('impl', 'wm protocol . WM_DELETE_WINDOW {', 4)],
+      set: function (s) { s.kv.interp = 'interp0 + console.tcl, aliases set'; } });
+  S('Show the window',
+    ['Back in the <code>show</code> branch, <code>wm deiconify</code> maps the console window. It is empty apart from a prompt. Output has not been redirected yet.'],
+    { code: [R('impl', 'show {', 3)], set: function (s) { s.con.vis = 'shown'; s.con.lines = [[T('(demo) 1 % ', 'p')]]; s.fresh = 'con'; } });
+  S('Remember the original encodings',
+    ['The branch only pushes the transforms if they are not already pushed: <code>chan push</code> always succeeds, so pushing twice would stack two layers, and one <code>chan pop</code> would then leave one behind, silently sending output into a hidden window.', 'Before pushing, it saves each channel\u2019s <code>-encoding</code> so <code>console hide</code> can put the real values back instead of assuming utf-8.'],
+    { code: [R('impl', 'if {!$::tkConsoleOut::pushed} {', 1), R('impl', 'set ::tkConsoleOut::stdoutEncoding [fconfigure stdout -encoding]', 2)], set: function (s) { s.kv.saved = 'stdout utf-8, stderr utf-8'; } });
+  S('chan push stdout',
+    ['<code>chan push stdout {::tkConsoleOut stdout}</code> stacks a transform on top of the channel that is already there. Tcl immediately calls the transform\u2019s <code>initialize</code> method, which sets <code>-buffering none</code> (so every <code>puts</code> reaches <code>write</code> at once) and answers with the methods it implements: <code>initialize finalize write flush</code>. There is no <code>read</code> method, so input is not transformed.'],
+    { code: [R('impl', 'chan push stdout {::tkConsoleOut stdout}', 1), R('impl', 'proc initialize {what x mode}', 4)], hot: 'tr', hotCh: 'stdout', newTr: 'stdout', set: function (s) { s.stacks.stdout.tr = true; } });
+  S('chan push stderr',
+    ['The same for stderr. Both channels now have the transform on top.'],
+    { code: [R('impl', 'chan push stderr {::tkConsoleOut stderr}', 1), R('impl', 'set ::tkConsoleOut::pushed 1', 1)], hot: 'tr', hotCh: 'stderr', newTr: 'stderr', set: function (s) { s.stacks.stderr.tr = true; s.kv.pushed = '1'; } });
+  S('console show returns',
+    ['<code>show</code> ends with <code>return ""</code>, so the command prints no result. From now on everything written to stdout and stderr is diverted to the console window instead of the terminal.', 'Only output moves. The terminal is still wish\u2019s stdin, and the console window accepts commands as well, so commands can be typed in either place.'],
+    { code: [R('impl', ['show {', 'return ""'], 1)], dest: 'con', set: function (s) { s.term.push([T('% ', 'p')]); } });
+  return { name: 'console show', script: script, steps: st, init: function () { return { term: termInit(), con: { vis: 'none', lines: [] }, stacks: baseStacks(false), kv: { pushed: '(no namespace yet)', autoload: '' }, fl: null, enc: { stdout: 'utf-8', stderr: 'utf-8' } }; }, label: 'the command that does not exist yet', hasDec: false };
+});
+
+/* 2. puts before the console */
+SC.push(function () {
+  var script = 'puts "hello \\u21a9 there"';
+  var text = 'hello \u21a9 there', by = encodeStr(text, 'utf-8');
+  var st = [];
+  function S(title, text_, o) { o = o || {}; o.title = title; o.text = text_; st.push(o); return o; }
+  S('A puts typed at the terminal',
+    ['No console has been created, so stdout is the ordinary channel: puts writes to it, and the operating system sends the bytes to the terminal. The escape <code>\\u21a9</code> in the script is six plain characters so far: a backslash, a u and four hex digits.'],
+    { hl: [script, 'cur'], where: 'terminal', set: function (s) { addTyped(s.term, script); }, hot: 'puts', fl: function () { return { rows: [{ lab: 'what you typed', cells: charCells('\\u21a9') }], note: 'six characters in the script text' }; } });
+  S('Tcl substitutes the escape',
+    ['Before <code>puts</code> runs, Tcl\u2019s parser replaces the six characters <code>\\u21a9</code> with the single character U+21A9, the arrow \u21a9. The word handed to <code>puts</code> is one 13-character string.'],
+    { nocode: 'Tcl core: backslash substitution in the parser. Not part of this TIP.', hl: [script, 'cur'], hl2: ['\\u21a9', 'sub'], hot: 'puts', fl: function () { return { rows: [{ lab: 'the string given to puts (13 characters)', cells: charCells(text, [6]) }] }; } });
+  S('puts writes to stdout',
+    ['<code>puts</code> passes the string to the channel named <code>stdout</code>. Here that is just the channel Tcl created at startup, with nothing stacked on it.'],
+    { nocode: 'Tcl core: <code>puts</code> and the channel layer.', hot: 'puts', fl: function () { return { rows: [{ lab: 'the string given to puts', cells: charCells(text, [6]) }] }; } });
+  S('The channel encodes to bytes',
+    ['A channel moves bytes, not characters. The channel itself converts the string, using the channel\u2019s <code>-encoding</code>, utf-8 here (it comes from the locale at startup). The arrow becomes three bytes <code>E2 86 A9</code>; the other characters are single bytes. 13 characters become 15 bytes.'],
+    { nocode: 'Tcl core: the channel\u2019s built-in encoding step.', hot: 'enc', fl: function () { return { rows: [{ lab: 'characters', cells: charCells(text, [6]) }, { lab: 'bytes after the utf-8 encoding (15)', cells: byteCells(by, [6, 7, 8]) }] }; } });
+  S('The bytes go to file descriptor 1',
+    ['With nothing in between, the channel writes the bytes to the operating system with a <code>write</code> on file descriptor 1.'],
+    { nocode: 'Tcl core and the operating system.', hot: 'fd', fl: function () { return { rows: [{ lab: 'bytes written to fd 1', cells: byteCells(by, [6, 7, 8]) }] }; } });
+  S('The terminal draws the arrow',
+    ['The terminal program, not Tcl, decodes those UTF-8 bytes and draws the glyph. <code>puts</code> then writes the newline as a second, one-byte write (<code>0A</code>) which moves the terminal to the next line. This is the behavior every Unix user has today, and what output looks like again after the console is closed.'],
+    { dest: 'term', hot: 'term', set: function (s) { s.term.push([T(text)]); s.term.push([T('% ', 'p')]); }, fl: function () { return { rows: [{ lab: 'bytes written to fd 1', cells: byteCells(by, [6, 7, 8]) }] }; } });
+  return { name: 'puts before the console', run: script, script: script, steps: st, init: function () { return { term: termInit(), con: { vis: 'none', lines: [] }, stacks: baseStacks(false), kv: { pushed: '(no console yet)', 'stdout -encoding': 'utf-8' }, fl: null, enc: { stdout: 'utf-8', stderr: 'utf-8' } }; }, label: 'normal output, no console yet', hasDec: false };
+});
+
+/* 3. puts after the console */
+SC.push(function () {
+  var script = 'puts "hello \\u21a9 there"';
+  var text = 'hello \u21a9 there', by = encodeStr(text, 'utf-8'), outStr = decodeVia(O.dec, 'utf-8', by);
+  var mojib = O.dec === 'none';
+  var st = [];
+  function S(title, text_, o) { o = o || {}; o.title = title; o.text = text_; st.push(o); return o; }
+  var outCells = function () { return mojib ? charCells(outStr, [6, 7, 8], 'g2') : charCells(outStr, [6]); };
+  S('The command arrives from the console',
+    ['You type the line at the console\u2019s prompt. Tk\u2019s <code>console.tcl</code> passes it to the <code>consoleinterp</code> alias, which runs in the application interpreter: the <code>record</code> branch adds the line to the history and evaluates it with <code>uplevel #0</code>.', 'The transform is already in place from the first script, so stdout is a stack: encoding on top, the transform below it, then the real channel.'],
+    { code: [R('impl', ['proc consoleinterp {sub cmd}', 'record {'], 5)], hl: [script, 'cur'], where: 'console', hot: 'puts', set: function (s) { addTyped(s.con.lines, script); } });
+  S('Tcl substitutes the escape',
+    ['Before <code>puts</code> runs, Tcl\u2019s parser replaces the six characters <code>\\u21a9</code> with the single character U+21A9. <code>puts</code> receives one 13-character string. None of this TIP\u2019s code has run yet.'],
+    { nocode: 'Tcl core: backslash substitution in the parser. Not part of this TIP.', hl: [script, 'cur'], hl2: ['\\u21a9', 'sub'], hot: 'puts', fl: function () { return { rows: [{ lab: 'the string given to puts (13 characters)', cells: charCells(text, [6]) }] }; } });
+  S('puts writes to the stdout channel',
+    ['<code>puts</code> hands the string to the channel named <code>stdout</code>. After <code>chan push</code> that name refers to the top of a stack: the channel itself, whose encoding step runs first, with the transform underneath it.'],
+    { code: [R('impl', 'chan push stdout {::tkConsoleOut stdout}', 1)], hot: 'puts', fl: function () { return { rows: [{ lab: 'the string given to puts', cells: charCells(text, [6]) }] }; } });
+  S('The channel encodes to bytes',
+    ['A transform sees bytes, not characters, because the channel\u2019s encoding step runs before the data reaches the transform. The channel converts the string using its <code>-encoding</code> setting, utf-8 here. The arrow becomes three bytes <code>E2 86 A9</code> and the other characters stay single bytes: 13 characters, 15 bytes.'],
+    { nocode: 'Tcl core: the channel\u2019s built-in encoding step.', hot: 'enc', fl: function () { return { rows: [{ lab: 'characters', cells: charCells(text, [6]) }, { lab: 'bytes after the utf-8 encoding (15)', cells: byteCells(by, [6, 7, 8]) }] }; } });
+  S('Tcl calls the transform\u2019s write method',
+    ['The bytes continue down to the transform. Tcl evaluates the command prefix given to <code>chan push</code> with the method name, the transform\u2019s handle and the data added: <code>::tkConsoleOut stdout &lt;handle&gt; write &lt;bytes&gt;</code>. The ensemble was created with <code>-parameters what</code>, so the first argument lands in <code>$what</code>.', 'Inside <code>write</code>, <code>$data</code> is a Tcl string of 15 characters whose values are the byte values 0\u2013255. The arrow is not in it; <code>\u00e2</code>, a control character and <code>\u00a9</code> are.'],
+    { code: [R('impl', 'proc write {what x data}', 1), R('impl', 'namespace ensemble create -parameters what', 1)], hot: 'tr', fl: function () { return { rows: [{ lab: '$data inside write: 15 characters, each one a byte value', cells: byteCells(by, [6, 7, 8]) }], note: 'The small glyph under each hex value is the character that byte value is as a Tcl character, which is what <code>$data</code> actually holds.' }; } });
+  if (O.dec === 'cur') {
+    S('Ask the channel which encoding it used',
+      ['<code>set enc [fconfigure $what -encoding]</code> reads the channel\u2019s encoding, here utf-8. Asking, rather than assuming utf-8, keeps the transform correct if someone later runs <code>fconfigure stdout -encoding</code> with something else (see the Latin-9 script). The "Decoding in write" switch at the top lets you compare with the wiki code, which never decoded.'],
+      { code: [R('impl', ['proc write {what x data}', 'set enc [fconfigure $what -encoding]'], 2)], hot: 'tr', set: function (s) { s.kv.enc = 'utf-8'; }, fl: function () { return { rows: [{ lab: '$data (unchanged)', cells: byteCells(by, [6, 7, 8]) }] }; } });
+  } else {
+    S('The wiki code: no decoding (simulated)',
+      ['The channel code on the wiki had no decode step. The demo simulates it: there is nothing to ask the channel, because the transform passes $data on exactly as received. This is the version that could not show \u21a9.'],
+      { alt: ['# the wiki code, simulated by the demo', '# (no encoding step: $data is used as received)'], hot: 'tr', fl: function () { return { rows: [{ lab: '$data (unchanged)', cells: byteCells(by, [6, 7, 8]) }] }; } });
+  }
+  if (O.dec !== 'none') {
+    S('Convert the bytes back to characters',
+      ['<code>encoding convertfrom utf-8 $data</code> turns the byte-characters back into real characters. <code>E2 86 A9</code> is read as one UTF-8 sequence and becomes U+21A9 again. 15 characters become 13, and <code>$data</code> equals the string you gave <code>puts</code>.', 'The word to remember is the direction: <code>convertfrom</code> always produces Tcl characters from bytes.'],
+      { code: [R('impl', ['proc write {what x data}', 'set data [encoding convertfrom $enc $data]'], 1)], hot: 'tr', set: function (s) { s.kv.data = '13 chars'; }, fl: function () { return { rows: [{ lab: 'bytes in', cells: byteCells(by, [6, 7, 8]) }, { lab: 'characters out (13)', cells: charCells(outStr, [6]) }] }; } });
+  } else {
+    S('Nothing converts the bytes',
+      ['Without the decode, $data stays 15 characters. The three bytes of the arrow are three separate characters: <code>\u00e2</code> (U+00E2), an invisible control character (U+0086) and <code>\u00a9</code> (U+00A9). That is what the text widget is about to be given.'],
+      { hot: 'tr', set: function (s) { s.kv.data = '15 chars (still bytes)'; }, fl: function () { return { rows: [{ lab: '$data going to the widget (15 characters)', cells: charCells(outStr, [6, 7, 8], 'g2') }] }; } });
+  }
+  S('Remove carriage returns',
+    ['<code>string map {\\r ""} $data</code> deletes any carriage returns before the text reaches the widget. There are none in this string, so it is unchanged.'],
+    { code: [R('impl', ['proc write {what x data}', 'set data [string map {\\r ""} $data]'], 1)], hot: 'tr', fl: function () { return { rows: [{ lab: '$data', cells: outCells() }] }; } });
+  S('Hand the text to the console interpreter',
+    ['<code>$consoleInterp eval [list ::tk::ConsoleOutput $what $data]</code> runs Tk\u2019s <code>ConsoleOutput</code> inside the console\u2019s own interpreter. <code>list</code> makes the data one argument whatever it contains. <code>ConsoleOutput</code> inserts the text into the <code>.console</code> text widget with the tag <code>stdout</code> (stderr gets the red tag), trims the buffer, and scrolls to show it.', mojib ? 'Because the bytes were never decoded, the widget receives <code>\u00e2</code>, a control character and <code>\u00a9</code>, and shows that instead of the arrow.' : 'The widget receives the arrow itself, U+21A9.'],
+    { code: [R('impl', ['proc write {what x data}', '$consoleInterp eval [list ::tk::ConsoleOutput'], 1), R('tkout', 'proc ::tk::ConsoleOutput {dest string} {', '^}')], hot: 'tr', dest: 'con', set: function (s) { s.con.lines.push([T(outStr)]); s.flash = 'con'; }, fl: function () { return { rows: [{ lab: 'text inserted into the .console widget', cells: outCells() }] }; } });
+  S('write returns an empty string',
+    ['<code>return ""</code> tells the channel layer that this transform has no output for the layer below. Nothing is passed down to file descriptor 1, so the terminal you started <code>wish</code> from shows nothing new. The output was diverted, not copied.'],
+    { code: [R('impl', ['proc write {what x data}', '$consoleInterp eval [list ::tk::ConsoleOutput', 'return ""'], 1)], hot: 'tr', dead: 'stdout', dest: 'con', fl: function () { return { rows: [{ lab: 'bytes passed on to fd 1', cells: [] }], note: 'nothing: <code>write</code> returned an empty string' }; } });
+  S('puts writes the newline',
+    ['<code>puts</code> sends its trailing newline as a second write call: one byte, <code>0A</code>. It takes the same route (encode, <code>write</code>, decode, <code>ConsoleOutput</code>) and ends the line. Tk\u2019s console then prints the next prompt.', 'The terminal is untouched and the console shows the text. Close the console window and the transforms are popped (see the last script), which is the only way output comes back to the terminal.'],
+    { code: [R('impl', ['proc write {what x data}', 'set data [string map {\\r ""} $data]'], 1)], hot: 'tr', dead: 'stdout', dest: 'con', set: function (s) { s.con.lines.push([T('(demo) 2 % ', 'p')]); }, fl: function () { return { rows: [{ lab: 'the second write call', cells: byteCells([10]) }, { lab: 'decoded', cells: charCells('\n') }] }; } });
+  return { name: 'puts after the console', run: script, script: script, steps: st, init: function () { return { term: termAfterShow(), con: { vis: 'shown', lines: [[T('(demo) 1 % ', 'p')]] }, stacks: baseStacks(true), kv: { pushed: '1', 'stdout -encoding': 'utf-8' }, fl: null, enc: { stdout: 'utf-8', stderr: 'utf-8' } }; }, label: 'output goes through the transform', hasDec: true, expect: { bytes: by, out: outStr } };
+});
+
+/* 4. a non-UTF-8 channel */
+SC.push(function () {
+  var cmd1 = 'fconfigure stdout -encoding iso8859-15', script = cmd1 + '\nputs "\\u20ac"';
+  var eur = '\u20ac', by = encodeStr(eur, 'iso8859-15'), outStr = decodeVia(O.dec, 'iso8859-15', by);
+  var wrong = outStr !== eur;
+  var st = [];
+  function S(title, text_, o) { o = o || {}; o.title = title; o.text = text_; st.push(o); return o; }
+  S('The channel before the fconfigure runs',
+    ['This is the starting point. stdout got its encoding from the locale when Tcl started, here utf-8, and stderr likewise. The transform is on top of both from the first script. The console command typed is <code>fconfigure stdout -encoding iso8859-15</code>, which has not run yet: compare the stdout strip with the next step.'],
+    { nocode: 'Nothing from this TIP runs here. The command has been typed but not executed.', hl: [cmd1, 'cur'], where: 'console', hot: 'enc', set: function (s) { addTyped(s.con.lines, cmd1); } });
+  S('fconfigure changes the setting',
+    ['Suppose the terminal is not UTF-8. <code>fconfigure stdout -encoding iso8859-15</code> (Latin-9, which has the euro sign at byte <code>A4</code>) changes the <code>-encoding</code> setting of the stdout channel, and the strip now reads iso8859-15. It does not push anything and the transform is not touched, so it will have to find out about the change on its own. stderr is a separate channel and keeps utf-8.'],
+    { nocode: 'Tcl core: <code>fconfigure</code> changing the channel’s <code>-encoding</code> setting (not a transform: nothing is pushed).', hl: [cmd1, 'cur'], hot: 'enc', set: function (s) { s.con.lines.push([T('(demo) 2 % ', 'p')]); s.enc.stdout = 'iso8859-15'; s.kv['stdout -encoding'] = 'iso8859-15'; } });
+  S('Now a puts with a \\u escape',
+    ['The second command writes a euro sign. As before, Tcl\u2019s parser replaces <code>\\u20ac</code> with the single character U+20AC before <code>puts</code> runs.'],
+    { nocode: 'Tcl core: backslash substitution in the parser.', hl: ['puts "\\u20ac"', 'cur'], hl2: ['\\u20ac', 'sub'], hot: 'puts', set: function (s) { addTyped(s.con.lines, 'puts "\\u20ac"'); }, fl: function () { return { rows: [{ lab: 'the string given to puts (1 character)', cells: charCells(eur, [0]) }] }; } });
+  S('The channel encodes with iso8859-15',
+    ['The channel\u2019s encoding step now uses Latin-9, so the euro sign becomes the single byte <code>A4</code>. In UTF-8 it would have been three bytes, <code>E2 82 AC</code>. The transform will see whichever the channel produced.'],
+    { nocode: 'Tcl core: the channel\u2019s built-in encoding step.', hot: 'enc', fl: function () { return { rows: [{ lab: 'character', cells: charCells(eur, [0]) }, { lab: 'byte after the iso8859-15 encoding', cells: byteCells(by, [0]) }] }; } });
+  S('Tcl calls write',
+    ['<code>write</code> receives a one-character string whose value is 0xA4. As a Tcl character that is U+00A4, the currency sign \u00a4. The euro sign is not in it; only a byte is.'],
+    { code: [R('impl', 'proc write {what x data}', 1)], hot: 'tr', fl: function () { return { rows: [{ lab: '$data inside write (1 character)', cells: byteCells(by, [0]) }] }; } });
+  if (O.dec === 'cur') {
+    S('Ask the channel which encoding it used',
+      ['<code>fconfigure $what -encoding</code> now answers <code>iso8859-15</code>. This is the case the line exists for: the transform learns the current encoding every time it is called, rather than assuming.'],
+      { code: [R('impl', ['proc write {what x data}', 'set enc [fconfigure $what -encoding]'], 2)], hot: 'tr', set: function (s) { s.kv.enc = 'iso8859-15'; }, fl: function () { return { rows: [{ lab: '$data (unchanged)', cells: byteCells(by, [0]) }] }; } });
+  } else {
+    S('The wiki code: no decoding (simulated)',
+      ['The wiki code did not decode. The demo simulates it: $data is used as received.'],
+      { alt: ['# the wiki code, simulated by the demo', '# (no encoding step: $data is used as received)'], hot: 'tr', fl: function () { return { rows: [{ lab: '$data (unchanged)', cells: byteCells(by, [0]) }] }; } });
+  }
+  var convText = O.dec === 'cur' ? ['<code>encoding convertfrom iso8859-15</code> maps byte <code>A4</code> to U+20AC. The euro sign comes out, as it should.']
+    : ['Nothing converts the byte, so $data stays U+00A4, the currency sign \u00a4, and that is what reaches the widget.'];
+  S(O.dec === 'none' ? 'Nothing converts the byte' : 'Convert the bytes back to characters', convText,
+    { code: O.dec === 'cur' ? [R('impl', ['proc write {what x data}', 'set data [encoding convertfrom $enc $data]'], 1)] : undefined, hot: 'tr',
+      fl: function () { return { rows: [{ lab: 'byte in', cells: byteCells(by, [0]) }, { lab: 'character out (1)', cells: charCells(outStr, [0], wrong ? 'g2' : 'g1') }] }; } });
+  S('Hand the text to the console',
+    ['<code>ConsoleOutput</code> inserts the result into the widget. ' + (wrong ? 'With this decoding the widget shows the currency sign \u00a4 where the euro sign was written.' : 'The widget shows the euro sign, although the channel was not UTF-8.')],
+    { code: [R('impl', ['proc write {what x data}', '$consoleInterp eval [list ::tk::ConsoleOutput'], 1)], hot: 'tr', dest: 'con', set: function (s) { s.con.lines.push([T(outStr)]); s.flash = 'con'; }, fl: function () { return { rows: [{ lab: 'text inserted into the .console widget', cells: charCells(outStr, [0], wrong ? 'g2' : 'g1') }] }; } });
+  S('write returns, and the newline follows',
+    ['<code>return ""</code> consumes the data as before, so the terminal shows nothing. <code>puts</code> then writes the newline as a second one-byte write, and the console prints its next prompt.'],
+    { code: [R('impl', ['proc write {what x data}', '$consoleInterp eval [list ::tk::ConsoleOutput', 'return ""'], 1)], hot: 'tr', dead: 'stdout', dest: 'con', set: function (s) { s.con.lines.push([T('(demo) 3 % ', 'p')]); }, fl: function () { return { rows: [{ lab: 'bytes passed on to fd 1', cells: [] }], note: 'nothing: <code>write</code> returned an empty string' }; } });
+  return { name: 'a Latin-9 channel', run: 'puts "\\u20ac"', script: script, steps: st, init: function () { return { term: termAfterShow(), con: { vis: 'shown', lines: [[T('(demo) 1 % ', 'p')]] }, stacks: baseStacks(true), kv: { pushed: '1', 'stdout -encoding': 'utf-8' }, fl: null, enc: { stdout: 'utf-8', stderr: 'utf-8' } }; }, label: 'the encoding is not utf-8', hasDec: true, expect: { bytes: by, out: outStr } };
+});
+
+/* 5. closing the console */
+SC.push(function () {
+  var script = '[ click the console window\u2019s close button ]';
+  var st = [];
+  function S(title, text_, o) { o = o || {}; o.title = title; o.text = text_; st.push(o); return o; }
+  S('Close button',
+    ['Clicking the close button does not destroy the window. The console interpreter installed a <code>WM_DELETE_WINDOW</code> handler: it calls <code>Oc_RestorePuts</code>, an alias that runs a procedure in the application interpreter, and then withdraws the window.'],
+    { code: [R('impl', 'wm protocol . WM_DELETE_WINDOW {', 4)], hl: [script, 'cur'], where: 'console', closeHot: true });
+  S('Pop the transform from stdout',
+    ['<code>chan pop stdout</code> removes the top layer. Tcl calls the transform\u2019s <code>finalize</code> method (an empty one here) and stdout is the plain channel again, with its built-in encoding step feeding file descriptor 1 directly.'],
+    { code: [R('impl', ['proc Oc_RestorePuts {slave} {', 'catch {chan pop stdout}'], 1)], hot: 'enc', hotCh: 'stdout', set: function (s) { s.stacks.stdout.tr = false; } });
+  S('Pop stderr and clear the flag',
+    ['The same for stderr, and <code>pushed</code> goes back to 0. That flag is what lets a later <code>console show</code> push the transforms again without stacking a second pair.'],
+    { code: [R('impl', ['proc Oc_RestorePuts {slave} {', 'catch {chan pop stderr}'], 2)], hot: 'enc', hotCh: 'stderr', set: function (s) { s.stacks.stderr.tr = false; s.kv.pushed = '0'; } });
+  S('Tell the user, on the terminal',
+    ['<code>puts stderr</code> now goes to the real stderr, because the transform is gone, so this message appears in the terminal where <code>wish</code> was started. <code>flush stderr</code> forces it out at once. The terminal is where the user\u2019s attention is after closing the window.'],
+    { code: [R('impl', ['proc Oc_RestorePuts {slave} {', 'puts stderr "\\n=== Console closed'], 2)], hot: 'fd', hotCh: 'stderr', dest: 'term',
+      set: function (s) { s.term.push([T('=== Console closed: output restored to terminal ===', 't')]); s.term.push([]); } });
+  S('The window is withdrawn, not destroyed',
+    ['The handler\u2019s last line, <code>wm withdraw .</code>, hides the window. The console interpreter and its history still exist, so a later <code>console show</code> deiconifies the same window and pushes the transforms again.'],
+    { code: [R('impl', ['wm protocol . WM_DELETE_WINDOW {', 'wm withdraw .'], 1)], set: function (s) { s.con.vis = 'hidden'; } });
+  return { name: 'closing the console', script: script, steps: st, init: function () { return { term: termAfterShow(), con: { vis: 'shown', lines: [[T('(demo) 1 % ', 'p')]] }, stacks: baseStacks(true), kv: { pushed: '1', 'stdout -encoding': 'utf-8' }, fl: null, enc: { stdout: 'utf-8', stderr: 'utf-8' } }; }, label: 'output returns to the terminal', hasDec: false };
+});
+
+var SCN = ['1  console show', '2  puts, no console', '3  puts, console shown', '4  Latin-9 channel', '5  close console'];
+
+/* ---------- state ---------- */
+var si = 0, cur = 0, cs = null;   /* scenario index, step index, built scenario */
+function build() { cs = SC[si](); if (cur >= cs.steps.length) cur = cs.steps.length - 1; }
+function clone(o) { return JSON.parse(JSON.stringify(o)); }
+function stateAt(i) {
+  var s = cs.init(); s.hot = null; s.dead = null;
+  for (var k = 0; k <= i && i >= 0; k++) { var step = cs.steps[k]; if (step.set) step.set(s); }
+  return s;
+}
+
+/* ---------- rendering ---------- */
+function runsHtml(line) { return line.map(function (r) { return '<span class="' + r[1] + '">' + vis(r[0]) + '</span>'; }).join(''); }
+function renderScript() {
+  var step = cs.steps[cur], sc = cs.script, h = '';
+  var hl = step.hl || (cs.run ? [cs.run, 'cur'] : null);
+  var idx = hl ? sc.indexOf(hl[0]) : -1;
+  if (idx < 0) h = esc(sc);
+  else {
+    var inner = esc(hl[0]);
+    if (step.hl2) { var j = hl[0].indexOf(step.hl2[0]); if (j >= 0) inner = esc(hl[0].slice(0, j)) + '<span class="' + step.hl2[1] + '">' + esc(step.hl2[0]) + '</span>' + esc(hl[0].slice(j + step.hl2[0].length)); }
+    h = esc(sc.slice(0, idx)) + '<span class="' + hl[1] + '">' + inner + '</span>' + esc(sc.slice(idx + hl[0].length));
+  }
+  var wh = step.where || (cur > 0 ? cs.steps.slice(0, cur + 1).reverse().map(function (x) { return x.where; }).filter(Boolean)[0] : null);
+  $('src').innerHTML = h;
+  $('srclbl').textContent = 'Command being run' + (wh ? ' (typed in the ' + wh + ')' : '');
+  $('srcnote').textContent = cs.label ? 'Script ' + (si + 1) + ' of 5: ' + cs.label : '';
+}
+function layer(cls, name, small, extra) { return '<div class="lay ' + cls + (extra || '') + '">' + name + (small ? '<small>' + small + '</small>' : '') + '</div>'; }
+function renderStacks(s, step) {
+  var h = '';
+  ['stdout', 'stderr'].forEach(function (ch) {
+    var isHot = step.hotCh ? step.hotCh === ch : ch === 'stdout';
+    var hot = function (id) { return step.hot === id && isHot ? ' hot' : ''; };
+    var newTr = step.newTr === ch ? ' new' : '';
+    var tr = s.stacks[ch].tr, dead = step.dead === ch, enc = s.enc[ch];
+    h += '<div class="chan">';
+    h += layer('puts', 'puts ' + ch + ' …', 'the caller: a string in', hot('puts')) + '<div class="arr">↓</div>';
+    h += '<div class="chframe"><div class="chname">channel <b>' + ch + '</b></div>';
+    h += '<div class="encstrip' + hot('enc') + '" data-tip="The channel’s own encoding step. It is a setting of the channel (-encoding), not a stacked transform: fconfigure changes it, chan push and chan pop never touch it.">-encoding <b>' + enc + '</b><small>characters → bytes</small></div>';
+    if (tr) h += '<div class="arr">↓ bytes</div>' + layer('tr', 'transform', '::tkConsoleOut ' + ch + '<br>write → console widget', hot('tr') + newTr) + '<div class="arr' + (dead ? ' dead' : '') + '">↓</div>';
+    else h += '<div class="arr">↓ bytes</div>';
+    h += layer('fd', 'fd ' + (ch === 'stdout' ? 1 : 2), 'the real channel', hot('fd'));
+    h += '</div>';
+    h += '<div class="dest' + (step.dest === 'term' && isHot ? ' on' : '') + '">→ terminal</div>';
+    if (tr) h += '<div class="dest' + (step.dest === 'con' && isHot ? ' on' : '') + '">transform → console window</div>';
+    h += '</div>';
+  });
+  $('stacks').innerHTML = h;
+}
+function renderKv(s, prev) {
+  var h = '';
+  Object.keys(s.kv).forEach(function (k) {
+    if (s.kv[k] === '') return;
+    var ch = !prev || prev.kv[k] !== s.kv[k];
+    h += '<span>' + esc(k) + '</span><span class="' + (ch && cur > 0 ? 'chg' : '') + '">' + esc(String(s.kv[k])) + '</span>';
+  });
+  $('kv').innerHTML = h;
+}
+function renderMini(step) {
+  var h = '', box = $('mini');
+  if (step.code) {
+    step.code.forEach(function (r, ri) {
+      var L = LINES[r.f];
+      h += '<div class="fh">' + esc(FILES[r.f].full) + ' &middot; line' + (r.e > r.s ? 's ' + r.s + '\u2013' + r.e : ' ' + r.s) + '</div>';
+      var a = Math.max(1, r.s - 1), b = Math.min(L.length, r.e + 1);
+      if (r.e - r.s > 22) { b = r.s + 22; }
+      for (var n = a; n <= b; n++) h += '<div' + (n >= r.s && n <= r.e ? ' class="on"' : '') + '><span class="n">' + n + '</span><span>' + esc(L[n - 1]) + '</span></div>';
+      if (r.e - r.s > 22) h += '<div class="sep">\u22ef ' + (r.e - b) + ' more lines</div>';
+    });
+    $('codeTitle').firstChild.textContent = 'Code ';
+    $('codeFile').textContent = step.code.map(function (r) { return FILES[r.f].label; }).filter(function (v, i, a) { return a.indexOf(v) === i; }).join(', ');
+  } else if (step.alt) {
+    h = '<div class="nocode">This step is not in the current code.</div>';
+    $('codeFile').textContent = 'simulated';
+  } else {
+    h = '<div class="nocode">' + (step.nocode || 'No code from this TIP runs in this step.') + '</div>';
+    $('codeFile').textContent = '';
+  }
+  if (step.alt) h += '<div class="alt">Simulated by the demo:<div class="mini">' + step.alt.map(function (l) { return '<div><span>' + esc(l) + '</span></div>'; }).join('') + '</div></div>';
+  box.innerHTML = h;
+}
+function renderFlight(s, step) {
+  var f = step.fl ? step.fl() : null, h = '';
+  if (!f) h = '<div class="flempty">Nothing in hand yet</div>';
+  else {
+    f.rows.forEach(function (r, i) {
+      if (i > 0) h += '<div class="flarrow">\u2193 ' + (r.arrow || '') + '</div>';
+      h += '<div class="row"><div class="rl">' + esc(r.lab) + '</div><div class="cells">' + (r.cells.length ? r.cells.map(function (c) { return '<div class="cell ' + c.k + '"><b>' + vis(c.g) + '</b><small>' + vis(c.s) + '</small></div>'; }).join('') : '<div class="flempty" style="padding:4px 12px">(empty)</div>') + '</div></div>';
+    });
+    if (f.note) h += '<div class="flnote">' + f.note + '</div>';
+  }
+  $('fl').innerHTML = h;
+}
+function winHtml(kind, title, lines, extra, hotX) {
+  var body = lines.map(runsHtml).join('\n');
+  return '<div class="win ' + kind + (extra || '') + '"><div class="tb"><span>' + title + '</span><span class="x' + (hotX ? ' hot' : '') + '">\u2715</span></div>' + (kind === 'con' ? '<div class="menu"><span>File</span><span>Edit</span></div>' : '') + '<div class="body">' + body + '<span class="cursor"></span></div></div>';
+}
+function renderShows(s, step, prev) {
+  $('term').innerHTML = winHtml('term', 'user@host: ~', s.term, step.dest === 'term' ? ' flash' : '', false);
+  var c = s.con, h;
+  if (c.vis === 'none') h = '<div class="ghost">The console does not exist yet.<br>No interpreter, no window.</div>';
+  else if (c.vis === 'hidden') h = '<div class="ghost">The console window exists but is withdrawn:<br>its interpreter is running, nothing is on screen.</div>';
+  else {
+    var fresh = (prev && prev.con.vis !== 'shown') ? ' fresh' : '';
+    h = winHtml('con', 'demo Console', c.lines, fresh + (step.dest === 'con' ? ' flash' : ''), !!step.closeHot);
+  }
+  $('con').innerHTML = h;
+}
+function render() {
+  var step = cs.steps[cur], s = stateAt(cur), prev = cur > 0 ? stateAt(cur - 1) : null;
+  s.hot = step.hot; s.dead = step.dead;
+  renderScript(); renderStacks(s, step); renderKv(s, prev); renderMini(step); renderFlight(s, step); renderShows(s, step, prev);
+  var loc = step.code && step.code[0] ? FILES[step.code[0].f].label + ' \u00b7 line' + (step.code[0].e > step.code[0].s ? 's ' + step.code[0].s + '\u2013' + step.code[0].e : ' ' + step.code[0].s) : (step.alt ? 'simulated' : 'Tcl core');
+  $('cap-top').textContent = 'Step ' + (cur + 1) + ' of ' + cs.steps.length + ' \u00b7 ' + loc;
+  $('cap-h').textContent = step.title;
+  $('cap-p').innerHTML = step.text.map(function (t) { return '<p>' + t + '</p>'; }).join('');
+  var dots = $('dots'); dots.innerHTML = '';
+  cs.steps.forEach(function (_, i) { var d = document.createElement('i'); d.className = i < cur ? 'done' : (i === cur ? 'cur' : ''); d.title = 'Step ' + (i + 1) + ': ' + cs.steps[i].title; d.onclick = function () { cur = i; render(); }; dots.appendChild(d); });
+  $('b-prev').disabled = cur === 0; $('b-next').disabled = cur === cs.steps.length - 1 && !($('playall').checked && si < SC.length - 1);
+  $('b-next').textContent = cur === cs.steps.length - 1 ? 'Done' : 'Next step';
+  $('decBox').style.display = cs.hasDec ? '' : 'none';
+  [].forEach.call($('scenSeg').children, function (b, i) { b.setAttribute('aria-pressed', i === si ? 'true' : 'false'); });
+  [].forEach.call($('decSeg').children, function (b) { b.setAttribute('aria-pressed', b.dataset.v === O.dec ? 'true' : 'false'); });
+  if (!$('codeview').hidden) renderCode(true);
+}
+function setScenario(i) { si = i; cur = 0; build(); render(); }
+
+/* ---------- controls ---------- */
+function mkSeg(el, items, fn) { el.innerHTML = ''; items.forEach(function (it, i) { var b = document.createElement('button'); b.textContent = it.t; b.dataset.v = it.v; if (it.tip) b.title = it.tip; b.onclick = function () { fn(it.v, i); }; el.appendChild(b); }); }
+mkSeg($('scenSeg'), SCN.map(function (t, i) { return { t: t, v: i }; }), function (v) { stopPlay(); setScenario(v); });
+mkSeg($('decSeg'), [{ t: 'fconfigure -encoding (current)', v: 'cur', tip: 'the code in consolecmd.impl' }, { t: 'none (the wiki code)', v: 'none', tip: 'the original wiki code, which had no decode step: simulated' }], function (v) { O.dec = v; build(); render(); });
+function next() { if (cur < cs.steps.length - 1) { cur++; render(); return true; } if ($('playall').checked && si < SC.length - 1) { setScenario(si + 1); return true; } return false; }
+function prev() { if (cur > 0) { cur--; render(); } }
+$('b-next').onclick = function () { stopPlay(); next(); };
+$('b-prev').onclick = function () { stopPlay(); prev(); };
+$('b-reset').onclick = function () { stopPlay(); cur = 0; render(); };
+var timer = null;
+function stopPlay() { if (timer) { clearTimeout(timer); timer = null; } $('b-play').textContent = 'Auto-play'; }
+function tick() { if (!next()) { stopPlay(); return; } timer = setTimeout(tick, parseFloat($('speed').value) * 1000); }
+function startPlay() { if (cur >= cs.steps.length - 1 && !($('playall').checked && si < SC.length - 1)) { cur = 0; render(); } $('b-play').textContent = 'Pause'; timer = setTimeout(tick, parseFloat($('speed').value) * 1000); }
+$('b-play').onclick = function () { timer ? stopPlay() : startPlay(); };
+
+/* ---------- full code view: Tcl tokens, and the nested fold model of the parser stepper ---------- */
+var cv = { file: 'impl', hits: [], stack: [], sym: null, symScroll: false };
+var touchUI = false;
+if (window.matchMedia && matchMedia('(pointer: coarse)').matches) { touchUI = true; document.body.classList.add('touch'); }
+var colorOn = true, foldOn = true, FST = {}, focusSig = '';
+var KW = /^(proc|namespace|if|else|elseif|switch|return|tailcall|uplevel|upvar|rename|source|set|variable|interp|chan|fconfigure|encoding|catch|error|foreach|package|load|bind|wm|puts|flush|info|eval|string|list|file|history|exit|unset|append|lappend|lindex|lrange|llength|split|expr|while|for|break|continue|alias|auto_load|ni|in)$/;
+var DEFS = null;
+function buildDefs() {
+  DEFS = {};
+  ORDER.forEach(function (f) {
+    LINES[f].forEach(function (l, i) {
+      var m = /^\s*;?proc\s+(\S+)/.exec(l);
+      if (m) { var last = m[1].replace(/^::/, '').split('::').pop(); (DEFS[last] = DEFS[last] || []).push({ f: f, line: i + 1 }); }
+      var m2 = /^\s*namespace eval\s+(\S+)\s*\{/.exec(l);
+      if (m2) { var n2 = m2[1].replace(/^::/, '').split('::').pop(); (DEFS[n2] = DEFS[n2] || []).push({ f: f, line: i + 1 }); }
+    });
+  });
+}
+function tokenize(line) {
+  if (/^\s*#/.test(line)) return [{ t: line, c: 'cm' }];
+  var out = [], re = /("(?:\\.|[^"\\])*")|(\$\{?[A-Za-z_:][\w:]*\}?)|(\b[A-Za-z_]\w*\b)/g, last = 0, m;
+  var push = function (t, c) { if (t) out.push({ t: t, c: c || '' }); };
+  while ((m = re.exec(line))) {
+    push(line.slice(last, m.index), '');
+    if (m[1]) push(m[1], 'st');
+    else if (m[2]) push(m[2], 'vr');
+    else {
+      var w = m[3], before = line.slice(0, m.index);
+      if (KW.test(w) && /(^|[\s\[{;])$/.test(before)) push(w, 'kw');
+      else if (DEFS && DEFS[w] && /proc\s+(::)?([\w:]*::)?$/.test(before)) push(w, 'fn');
+      else push(w, '');
+    }
+    last = m.index + m[0].length;
+  }
+  push(line.slice(last), '');
+  return out;
+}
+
+/* ---- the structure of a file: brace pairs that open at the end of a line, the units (procs and other top-level blocks) and the blocks inside them ---- */
+var AN = {};
+function analyze(f) {
+  if (AN[f]) return AN[f];
+  var L = LINES[f], stack = [], pairs = [], ok = true, k, j;
+  for (k = 0; k < L.length; k++) {
+    var line = L[k]; if (/^\s*#/.test(line)) continue;
+    for (j = 0; j < line.length; j++) {
+      var c = line[j];
+      if (c === '\\') { j++; continue; }
+      if (c === '{') stack.push({ k: k, j: j });
+      else if (c === '}') { var o = stack.pop(); if (!o) { ok = false; continue; } pairs.push({ o: o.k, oj: o.j, c: k }); }
+    }
+  }
+  if (stack.length) ok = false;
+  var regs = [];
+  pairs.forEach(function (p) {
+    if (L[p.o].slice(p.oj + 1).trim() !== '') return;                  /* the brace must be the last thing on its line */
+    var s = p.o + 1, e = p.c - 1; if (e - s + 1 < 2) return;            /* at least two lines to hide */
+    var h = p.o; while (h > 0 && /\\\s*$/.test(L[h - 1])) h--;          /* a command continued with backslash: the square goes on its first line */
+    regs.push({ s: s, e: e, o: p.o, hdr: h, proc: /^\s*;?proc\s/.test(L[h]) });
+  });
+  regs.sort(function (a, b) { return a.s - b.s || b.e - a.e; });
+  var inside = function (a, b) { return a !== b && a.s <= b.s && a.e >= b.e; };
+  var units = [], cands = [];
+  regs.forEach(function (r) {
+    if (r.proc) { units.push(r); return; }
+    var hasProc = regs.some(function (q) { return q.proc && inside(r, q); });
+    var inProc = regs.some(function (q) { return q.proc && inside(q, r); });
+    if (!hasProc && !inProc) cands.push(r);
+  });
+  cands.forEach(function (r) { if (!cands.some(function (q) { return inside(q, r); })) units.push(r); });
+  units.forEach(function (u) { u.b0 = u.hdr; u.b1 = u.e + 1; u.inner = regs.filter(function (r) { return inside(u, r) && !r.proc; }); });
+  return (AN[f] = { ok: ok, regs: regs, units: units });
+}
+/* every proc of a file for the docked name bar, foldable or not, with the comment block above it */
+var BARF = {};
+function barFuncs(f) {
+  if (BARF[f]) return BARF[f];
+  var L = LINES[f], an = analyze(f), R = [];
+  L.forEach(function (l, k) {
+    if (!/^\s*;?proc\s/.test(l)) return;
+    var u = an.units.filter(function (x) { return x.hdr === k && x.proc; })[0];
+    var b1 = u ? u.b1 : k;
+    var q = k - 1;
+    if (q > 0 && L[q].trim() === '' && /^\s*#/.test(L[q - 1])) q--;
+    while (q >= 0 && /^\s*#/.test(L[q])) q--;
+    var c0 = q + 1 < k ? q + 1 : k;
+    R.push({ hdr: k, b1: b1, c0: c0 });
+  });
+  return (BARF[f] = R);
+}
+var GCOL = ['--g0', '--g1', '--g2', '--g3'], SQ = 'M2 2H12V12H2Z';
+function foldState(f, u) {
+  if (u.st) return u.st;
+  var nodes = [{ id: 0, s: u.s, e: u.e, hdr: u.hdr, depth: 0, parent: null, kids: [], open: false }];
+  u.inner.slice().sort(function (a, b) { return a.s - b.s || b.e - a.e; }).forEach(function (r, k) { nodes.push({ id: k + 1, s: r.s, e: r.e, hdr: r.hdr, depth: 0, parent: null, kids: [], open: false }); });
+  nodes.slice(1).forEach(function (x) {
+    var best = nodes[0];
+    nodes.forEach(function (y) { if (y.id !== 0 && y !== x && y.s <= x.s && y.e >= x.e && (y.e - y.s) < (best.e - best.s)) best = y; });
+    x.parent = best; best.kids.push(x);
+  });
+  (function dep(x, d) { x.depth = d; x.kids.forEach(function (c) { dep(c, d + 1); }); })(nodes[0], 0);
+  var byHdr = {}; nodes.forEach(function (x) { if (!(x.hdr in byHdr)) byHdr[x.hdr] = x; });
+  var dmax = Math.max.apply(null, nodes.map(function (x) { return x.depth; })) + 1;
+  var key = f + ':' + u.hdr;
+  return (FST[key] = u.st = { key: key, tab: f, fn: u, nodes: nodes, byHdr: byHdr, DMAX: dmax, cap: dmax });
+}
+function fsub(x, out) { out = out || []; out.push(x); x.kids.forEach(function (c) { fsub(c, out); }); return out; }
+function feff(st, x) { return Math.min(x.depth, st.cap - 1); }
+function fvisible(x) { for (var p = x.parent; p; p = p.parent) if (!p.open) return false; return true; }
+function ffull(x) { return fsub(x).every(function (y) { return y.open; }); }
+function fany(x) { return fsub(x).some(function (y) { return y.open; }); }
+function flevels(st, x) {
+  var all = fsub(x), top = Math.max.apply(null, all.map(function (y) { return feff(st, y); })), op = all.filter(function (y) { return y.open; });
+  return [op.length ? Math.max.apply(null, op.map(function (y) { return feff(st, y); })) - feff(st, x) + 1 : 0, top - feff(st, x) + 1];
+}
+function fopen(st, x) {
+  var cand = fsub(x).filter(function (y) { return !y.open && fvisible(y) && (y === x || y.parent.open); });
+  if (!cand.length) return false;
+  var m = Math.min.apply(null, cand.map(function (y) { return feff(st, y); }));
+  cand.filter(function (y) { return feff(st, y) === m; }).forEach(function (y) { if (m >= st.cap - 1) fsub(y).forEach(function (z) { z.open = true; }); else y.open = true; });
+  return true;
+}
+function fclose(st, x) {
+  var op = fsub(x).filter(function (y) { return y.open; });
+  if (!op.length) return false;
+  var m = Math.max.apply(null, op.map(function (y) { return feff(st, y); }));
+  op.filter(function (y) { return feff(st, y) === m; }).forEach(function (y) { y.open = false; });
+  return true;
+}
+function fall(st, x) { var o = fany(x); fsub(x).forEach(function (y) { y.open = !o; }); }
+function fsnap(st) { return st.nodes.map(function (x) { return x.open; }); }
+function frestore(st, sn) { st.nodes.forEach(function (x, k) { x.open = sn[k]; }); }
+function openToFocus(st, fk) {
+  var ks = fk.filter(function (k) { return k >= st.fn.hdr + 1 && k <= st.fn.b1 - 1; });
+  if (!ks.length) return;
+  if (!st.nodes[0].open) st.nodes.forEach(function (x) { if (x.depth <= 1) x.open = true; });
+  ks.forEach(function (k) { st.nodes.forEach(function (x) { if (k >= x.s && k <= x.e) x.open = true; }); });
+}
+function fsvg(full) { return '<svg width="14" height="14" viewBox="0 0 14 14" aria-hidden="true"><path d="' + SQ + '" fill="var(--diabg)" stroke="var(--dia)" stroke-width="1.4" stroke-linejoin="round"/><circle cx="7" cy="7" r="2.8" fill="var(--' + (full ? 'red' : 'green') + ')"/></svg>'; }
+var LINEST = null;
+function ftip(st, x) {
+  var full = ffull(x), any = fany(x), lv = flevels(st, x);
+  var what = x.open ? (full ? 'Everything below is open (red dot).' : 'Open to level ' + lv[0] + ' of ' + lv[1] + ' (green dot: more to open).') : 'Closed (' + (x.e - x.s + 1) + ' lines hidden; green dot: more to open).';
+  var how = touchUI
+    ? 'Tap: open one more level. Hold: close the innermost open level. Double-tap: ' + (any ? 'close everything below.' : 'open everything below.')
+    : 'Click: open one more level. Right-click: close the innermost open level. Double-click: ' + (any ? 'close everything below.' : 'open everything below.');
+  return what + ' ' + how;
+}
+function fpopOpts(st) { var o = ''; for (var d = 1; d <= st.DMAX; d++) o += '<option value="' + d + '"' + (d === st.cap ? ' selected' : '') + '>' + (d === st.DMAX ? 'all' : d) + '</option>'; return o; }
+var escq = function (s) { return esc(s).replace(/"/g, '&quot;'); };
+function fgutter(st, k) {
+  var hd = st.byHdr[k], v = '', seen = 0, n0 = st.nodes[0], dia = '';
+  for (var q = 0; q < st.nodes.length; q++) {
+    var x = st.nodes[q];
+    if (x.open && k >= x.s && k <= x.e) { var c = feff(st, x); if (!((seen >> c) & 1)) { seen |= 1 << c; v += '<b class="v c' + (c % 4) + '" style="--c:' + c + '"></b>'; } }
+  }
+  if (!(seen & 1) && n0.open && k > n0.hdr && k <= st.fn.b1) v += '<b class="v c0" style="--c:0"></b>';
+  var extra = '';
+  if (hd) {
+    dia = '<button class="dia" data-fk="' + st.key + '" data-ni="' + hd.id + '" style="--c:' + Math.min(hd.depth, st.cap - 1) + '" aria-label="' + escq(ftip(st, hd)) + '" data-tip="' + escq(ftip(st, hd)) + '">' + fsvg(ffull(hd)) + '</button>';
+    if (!hd.open) extra += '<span class="ell">\u22ef ' + (hd.e - hd.s + 1) + ' lines</span>';
+    if (hd.id === 0 || (hd.open && !ffull(hd))) { var lv = flevels(st, hd); extra += '<span class="lvl" data-tip="Levels open below this fold: ' + lv[0] + ' of ' + lv[1] + '. Each click on its square opens one more.">level ' + lv[0] + ' of ' + lv[1] + '</span>'; }
+    if (hd.id === 0) extra += '<select class="pop" data-fk="' + st.key + '" data-tip="How many clicks open everything below this unit. A smaller number opens the deepest blocks together." aria-label="maximum depth">' + fpopOpts(st) + '</select>';
+  }
+  return { html: v + dia, extra: extra ? '<span class="fx"> ' + extra + '</span>' : '' };
+}
+
+/* ---- the code of one line, with the highlighted name marked ---- */
+function lineHtml(l, sy) {
+  var toks = tokenize(l), h = '', col = 0;
+  toks.forEach(function (tk) {
+    var t = tk.t, inner = '';
+    if (sy && tk.c !== 'st') {
+      var rx = /[A-Za-z_]\w*/g, m, last = 0;
+      while ((m = rx.exec(t))) {
+        if (m[0] !== sy.word) continue;
+        var c = col + m.index, d = c + m[0].length;
+        if ((c > 0 && /\w/.test(l[c - 1])) || (d < l.length && /\w/.test(l[d]))) continue;
+        inner += esc(t.slice(last, m.index)) + '<mark class="sym' + (sy.cur === c ? ' cur' : '') + '">' + esc(m[0]) + '</mark>'; last = m.index + m[0].length;
+      }
+      inner += esc(t.slice(last));
+    } else inner = esc(t);
+    h += tk.c ? '<span class="' + tk.c + '">' + inner + '</span>' : inner;
+    col += t.length;
+  });
+  return h;
+}
+
+/* ---- double-click a plain name: highlight it in its proc, with a count and next / previous ---- */
+function symScan(f, word, a, b) {
+  var out = [], L = LINES[f];
+  for (var k = a; k <= b && k < L.length; k++) {
+    var col = 0;
+    tokenize(L[k]).forEach(function (tk) {
+      if (tk.c !== 'st') {
+        var rx = /[A-Za-z_]\w*/g, m;
+        while ((m = rx.exec(tk.t))) {
+          var c = col + m.index, d = c + m[0].length;
+          if (m[0] === word && !(c > 0 && /\w/.test(L[k][c - 1])) && !(d < L[k].length && /\w/.test(L[k][d]))) out.push({ k: k, col: c, cm: tk.c === 'cm' });
+        }
+      }
+      col += tk.t.length;
+    });
+  }
+  return out;
+}
+function symStart(hit) {
+  var f = cv.file, a = 0, b = LINES[f].length - 1, scope = 'file', fnName = '';
+  var fn = barFuncs(f).filter(function (q) { return hit.k >= q.c0 && hit.k <= q.b1; })[0];
+  if (fn) { scope = 'fn'; a = fn.c0; b = fn.b1; fnName = (/proc\s+(\S+)/.exec(LINES[f][fn.hdr]) || [])[1] || ''; }
+  cv.sym = { file: f, word: hit.word, scope: scope, fnA: a, fnB: b, fnName: fnName, a: a, b: b, list: [], idx: 0, noFn: !fn };
+  symRecount(hit);
+}
+function symRecount(at) {
+  var S = cv.sym; if (!S) return;
+  if (S.scope === 'file') { S.a = 0; S.b = LINES[S.file].length - 1; } else { S.a = S.fnA; S.b = S.fnB; }
+  var cur = at || S.list[S.idx];
+  S.list = symScan(S.file, S.word, S.a, S.b);
+  var ix = -1;
+  if (cur) S.list.forEach(function (m, q) { if (ix < 0 && m.k === cur.k && m.col === cur.col) ix = q; });
+  S.idx = ix >= 0 ? ix : 0;
+}
+function symStep(d) {
+  var S = cv.sym; if (!S || !S.list.length) return;
+  S.idx = (S.idx + d + S.list.length) % S.list.length;
+  cv.symScroll = true; renderCode();
+}
+function symClear() { if (!cv.sym) return false; cv.sym = null; var pre = $('codepre'), top = pre.scrollTop; renderCode(true); pre.scrollTop = top; return true; }
+function updateSymBar() {
+  var bar = $('symbar'), S = cv.sym;
+  if (!S) { bar.hidden = true; bar.innerHTML = ''; return; }
+  var n = S.list.length, cm = S.list.filter(function (m) { return m.cm; }).length;
+  var where = S.scope === 'file' ? 'in this file' : 'in ' + (S.fnName || 'this proc');
+  bar.hidden = false;
+  bar.innerHTML = '<code>' + esc(S.word) + '</code><span>' + n + (n === 1 ? ' match ' : ' matches ') + where + (cm ? ' (' + cm + ' in comments)' : '') + ' &middot; ' + (n ? 'showing ' + (S.idx + 1) + ' of ' + n : '') + '</span>'
+    + '<button data-a="prev" title="Previous match (N)">\u25c0 prev</button><button data-a="next" title="Next match (n)">next \u25b6</button>'
+    + (S.noFn ? '<span class="cmsg">not inside a proc: the whole file</span>' : '<button data-a="scope" title="Switch between this proc and the whole file">' + (S.scope === 'file' ? 'this proc only' : 'whole file') + '</button>')
+    + '<span class="sp2"></span><button data-a="clear" title="Clear (Esc)">\u00d7 clear</button>';
+}
+$('symbar').addEventListener('click', function (e) {
+  var b = e.target.closest('button'); if (!b || !cv.sym) return;
+  var a = b.dataset.a;
+  if (a === 'next') symStep(1); else if (a === 'prev') symStep(-1);
+  else if (a === 'clear') symClear();
+  else if (a === 'scope') { cv.sym.scope = cv.sym.scope === 'file' ? 'fn' : 'file'; symRecount(); cv.symScroll = true; renderCode(); }
+});
+
+/* ---- the docked name bar: while you read inside a proc whose name line has scrolled off, its square, level and menu stay in view ---- */
+function rowAt(pre, y) {
+  var kids = pre.children, lo = pre.firstElementChild.classList.contains('fnbar') ? 2 : 1, hi = kids.length - 2;
+  if (hi < lo) return null;
+  while (lo < hi) { var mid = (lo + hi) >> 1; if (kids[mid].offsetTop + kids[mid].offsetHeight > y) hi = mid; else lo = mid + 1; }
+  return kids[lo];
+}
+function barTarget(pre) {
+  var ln = LINEST && rowAt(pre, pre.scrollTop + 1); if (!ln || ln.dataset.k === undefined) return null;
+  var k = +ln.dataset.k, st = LINEST[k];
+  return (st && k !== st.nodes[0].hdr && k <= st.fn.b1) ? st : null;
+}
+function updateBar(force) {
+  var pre = $('codepre'), bar = pre.firstElementChild;
+  if (!bar || !bar.classList.contains('fnbar')) return;
+  var st = barTarget(pre);
+  if (!st) { bar.classList.remove('on'); bar.dataset.key = ''; return; }
+  if (force || bar.dataset.key !== st.key) {
+    var k0 = st.nodes[0].hdr, go = '<button class="goto" data-go="' + k0 + '" aria-label="go to the top of this proc" data-tip="Scroll to the first line of this proc.">go there</button>';
+    if (!foldOn || st.light) bar.firstChild.innerHTML = '<i>' + (k0 + 1) + '</i><span class="cb">' + esc(LINES[st.tab][k0]) + '</span>' + go;
+    else { var g = fgutter(st, k0); bar.firstChild.innerHTML = '<b class="g">' + g.html + '</b><i>' + (k0 + 1) + '</i><span class="cb">' + esc(LINES[st.tab][k0]) + '</span>' + go + g.extra; }
+    bar.dataset.key = st.key;
+  }
+  bar.classList.add('on');
+}
+$('codepre').addEventListener('scroll', function () { updateBar(); hideTip(); }, { passive: true });
+
+/* ---- opening, rendering ---- */
+function stepHits(f) {
+  var step = cs.steps[cur], h = [];
+  if (step.code) step.code.forEach(function (r) { if (r.f === f) for (var n = r.s; n <= r.e; n++) h.push(n); });
+  return h;
+}
+function openCode(file) {
+  var step = cs.steps[cur];
+  cv.stack = []; cv.sym = null; focusSig = '';
+  cv.file = file || (step.code && step.code[0] ? step.code[0].f : cv.file);
+  cv.hits = stepHits(cv.file); cv.cmsg = '';
+  $('codeview').hidden = false; $('walk').style.display = 'none'; $('b-code').textContent = 'Hide code';
+  renderCode();
+}
+function renderCode(keepScroll) {
+  var f = cv.file, L = LINES[f], step = cs.steps[cur];
+  var hitSet = {}; cv.hits.forEach(function (n) { hitSet[n - 1] = 1; });
+  var hitK = cv.hits.length ? cv.hits[0] - 1 : -1;
+  var S = cv.sym && cv.sym.file === f ? cv.sym : null; if (cv.sym && !S) cv.sym = null;
+  var symCur = S ? S.list[S.idx] : null;
+  var focusK = cv.hits.map(function (n) { return n - 1; }); if (symCur) focusK.push(symCur.k);
+  var stepFile = step.code && step.code[0] ? step.code[0].f : null;
+  $('code-h').textContent = 'Step ' + (cur + 1) + ': ' + step.title;
+  $('ctabs').innerHTML = ORDER.map(function (k) { return '<button data-n="' + k + '" aria-pressed="' + (k === f) + '">' + FILES[k].label + (k === stepFile ? ' \u2022' : '') + '</button>'; }).join('');
+  $('cmsg').textContent = cv.cmsg || FILES[f].note;
+  var hid = [], lineSt = [], gcols = 0, funcs = [], barSt = [], c0of = {};
+  barFuncs(f).forEach(function (q) { c0of[q.hdr] = q.c0; var o = { key: f + ':n' + q.hdr, tab: f, light: true, nodes: [{ hdr: q.hdr }], fn: { b1: q.b1 } }; for (var z = q.c0; z <= q.b1; z++) barSt[z] = o; });
+  if (foldOn) {
+    funcs = analyze(f).units.map(function (u) { return foldState(f, u); });
+    funcs.forEach(function (st) { gcols = Math.max(gcols, st.DMAX); });
+    var sig = f + '|' + cv.hits.join(',') + '|' + (symCur ? symCur.k + ':' + symCur.col + ':' + S.word : '') + '|' + cur + '|' + si + '|' + O.dec;
+    if (sig !== focusSig) { focusSig = sig; funcs.forEach(function (st) { openToFocus(st, focusK); }); }
+    funcs.forEach(function (st) {
+      for (var q = st.nodes[0].hdr; q <= st.fn.b1; q++) lineSt[q] = st;
+      for (var q3 = (c0of[st.nodes[0].hdr] !== undefined ? c0of[st.nodes[0].hdr] : st.nodes[0].hdr); q3 <= st.fn.b1; q3++) barSt[q3] = st;
+      st.nodes.forEach(function (x) { if (!x.open) for (var q2 = x.s; q2 <= x.e; q2++) hid[q2] = true; });
+    });
+  }
+  $('codepre').style.setProperty('--gn', gcols || 1);
+  var out = [];
+  L.forEach(function (l, k) {
+    if (hid[k]) return;
+    var cls = 'ln' + (hitSet[k] ? ' hit' : ''), gut = '', fx = '';
+    if (gcols) { var g = lineSt[k] ? fgutter(lineSt[k], k) : { html: '', extra: '' }; gut = '<b class="g">' + g.html + '</b>'; fx = g.extra; }
+    var sy = (S && k >= S.a && k <= S.b) ? { word: S.word, cur: symCur && symCur.k === k ? symCur.col : -1 } : null;
+    out.push('<span class="' + cls + '" data-k="' + k + '">' + gut + '<i>' + (k + 1) + '</i><span class="cb">' + (lineHtml(l, sy) || ' ') + '</span>' + fx + '</span>');
+  });
+  LINEST = barSt;
+  out.unshift('<div class="sp"></div>'); out.push('<div class="sp"></div>');
+  out.unshift('<div class="fnbar"><div class="fb ln"></div></div>');
+  var pre = $('codepre'); pre.innerHTML = out.join(''); pre.className = 'code' + (colorOn ? '' : ' nocolor');
+  var cEl = pre.querySelector('mark.sym.cur'), hEl = pre.querySelector('.ln.hit');
+  if (keepScroll) { /* a fold click: the caller keeps the square where it was */ }
+  else if (cv.symScroll && cEl) pre.scrollTop = Math.max(0, cEl.closest('.ln').offsetTop - pre.clientHeight / 3);
+  else if (hEl) pre.scrollTop = Math.max(0, hEl.offsetTop - pre.clientHeight / 3);
+  else pre.scrollTop = 0;
+  hideTip();
+  var fh = $('foldhelp'); fh.hidden = !foldOn;
+  if (!fh.hidden) fh.innerHTML = '<b>Fold squares</b> (' + fsvg(false).replace('width="14" height="14"', 'width="12" height="12"') + ' green = more to open, ' + fsvg(true).replace('width="14" height="14"', 'width="12" height="12"') + ' red = everything below is open): '
+    + (touchUI ? '<b>tap</b> opens one more level, <b>hold</b> closes the innermost level, <b>double-tap</b> opens everything or, if anything is open, closes everything.'
+               : '<b>click</b> opens one more level, <b>right-click</b> closes the innermost level, <b>double-click</b> opens everything or, if anything is open, closes everything.')
+    + ' The menu beside a proc name sets how many clicks open everything. Hover a square for what it will do now.';
+  cv.symScroll = false; updateSymBar(); updateBar();
+  $('b-back').textContent = cv.stack.length ? '\u2190 Back (' + cv.stack.length + ')' : '\u2190 Back';
+  $('cnote').innerHTML = 'The whole file (' + L.length + ' lines). ' + (foldOn ? 'With Fold on, each proc (and each top-level block that holds no proc) has a square on its first line, and every block inside it (if / else, switch arms, foreach, catch, script bodies) has one on its first line. ' : '')
+    + (colorOn ? 'Comments are <span class="cm">green</span>, strings <span class="st">red</span>, variables <span class="vr">teal</span>, Tcl commands <span class="kw">purple</span>, proc names <span class="fn">blue</span>. ' : '')
+    + 'A double-click on the name of a proc or namespace in these files jumps to its definition; a double-click on any other name highlights it in its proc, with a count and next / previous (<kbd>n</kbd> / <kbd>N</kbd>, <kbd>Esc</kbd> clears). To go back: the Back button, <kbd>Backspace</kbd>, a double-click on the name you just jumped to, or a double-click on blank space.';
+}
+function closeCode() { $('codeview').hidden = true; $('walk').style.display = 'flex'; $('b-code').textContent = 'Show code'; cv.sym = null; }
+$('b-code').onclick = function () { if ($('codeview').hidden) openCode(); else closeCode(); };
+$('mini').onclick = function (e) { if (e.target.closest('.alt')) return; var st = cs.steps[cur]; if (st.code) openCode(); };
+function goBack() {
+  var v = cv.stack.pop(); if (!v) { closeCode(); return; }
+  cv.file = v.file; cv.hits = v.hits; cv.sym = null; cv.cmsg = '';
+  renderCode(true); $('codepre').scrollTop = v.top;
+}
+$('b-back').onclick = goBack;
+$('ctabs').addEventListener('click', function (e) {
+  var b = e.target.closest('button'); if (!b) return;
+  cv.stack = []; cv.file = b.dataset.n; cv.hits = stepHits(cv.file); cv.sym = null; cv.cmsg = ''; renderCode();
+});
+$('colorOn').onchange = function () { colorOn = this.checked; var pre = $('codepre'), top = pre.scrollTop; renderCode(true); pre.scrollTop = top; };
+$('foldOn').onchange = function () { foldOn = this.checked; FST = {}; AN = {}; BARF = {}; focusSig = ''; renderCode(); };
+
+/* ---- the squares: click opens a level, right click closes one, double click opens or closes all; touch: tap, hold, double tap ---- */
+var fptype = 'mouse', fbefore = null, flastTap = null, fhold = null, fheld = false;
+function diaOf(e) { var d = e.target.closest && e.target.closest('.dia'); if (!d) return null; var st = FST[d.dataset.fk]; return st ? { st: st, x: st.nodes[+d.dataset.ni], el: d } : null; }
+function foldDo(h, act) {
+  var pre = $('codepre'), el = h.el && h.el.isConnected ? h.el : null, fromBar = !!(el && el.closest('.fnbar'));
+  var sel = '.dia[data-fk="' + h.st.key + '"][data-ni="' + h.x.id + '"]', y0 = el ? el.getBoundingClientRect().top : null, hadFocus = document.activeElement === el;
+  var prev = {}, nPrev = 0; pre.querySelectorAll('.ln[data-k]').forEach(function (r) { prev[r.dataset.k] = 1; nPrev++; });
+  var topK = null, topY = 0;
+  if (fromBar) { var tr = rowAt(pre, pre.scrollTop + el.getBoundingClientRect().height + 2); if (tr) { topK = tr.dataset.k; topY = tr.getBoundingClientRect().top; } }
+  act(); renderCode(true);
+  var nNow = 0, fresh = []; pre.querySelectorAll('.ln[data-k]').forEach(function (r) { nNow++; if (!prev[r.dataset.k]) fresh.push(r); });
+  fresh.forEach(function (r) { r.classList.add('flash'); });
+  var el2;
+  if (fromBar) {
+    var l2 = pre.querySelector('.ln[data-k="' + topK + '"]');
+    if (l2) pre.scrollTop += l2.getBoundingClientRect().top - topY;
+    else { var hl = pre.querySelector('.ln[data-k="' + h.st.nodes[0].hdr + '"]'); if (hl) pre.scrollTop = hl.offsetTop - 1; }
+    updateBar(true);
+    el2 = pre.querySelector('.fnbar.on ' + sel) || pre.querySelector('.ln ' + sel);
+  } else {
+    el2 = pre.querySelector('.ln ' + sel);
+    if (el2 && y0 !== null) {
+      var dy = el2.getBoundingClientRect().top - y0;
+      if (Math.abs(dy) > 0.5) { pre.scrollTop += dy; var dy2 = el2.getBoundingClientRect().top - y0; if (Math.abs(dy2) > 0.5) window.scrollBy(0, dy2); }
+    }
+    updateBar(true);
+  }
+  if (el2 && hadFocus) el2.focus({ preventScroll: true });
+  if (nNow !== nPrev && el2) {
+    var host = el2.closest('.ln, .fb'), fx = host.querySelector('.fx'), t = document.createElement('span'); t.className = 'toast'; t.setAttribute('role', 'status');
+    t.textContent = (nNow > nPrev ? '+' : '\u2212') + Math.abs(nNow - nPrev) + ' lines below';
+    if (!fx) { fx = document.createElement('span'); fx.className = 'fx'; host.appendChild(fx); }
+    fx.appendChild(t); setTimeout(function () { if (t.parentNode) t.parentNode.removeChild(t); }, 2300);
+  }
+}
+var fendHold = function () { if (fhold) { clearTimeout(fhold); fhold = null; } };
+$('codepre').addEventListener('pointerdown', function (e) {
+  var h = diaOf(e); if (!h) return;
+  fptype = e.pointerType || 'mouse'; fheld = false;
+  if (fptype === 'touch') fhold = setTimeout(function () { fheld = true; fhold = null; foldDo(h, function () { fclose(h.st, h.x); }); }, 450);
+});
+$('codepre').addEventListener('pointerup', function (e) {
+  var h = diaOf(e); fendHold(); if (!h || e.pointerType !== 'touch' || fheld) return;
+  var now = Date.now();
+  if (flastTap && flastTap.k === h.st.key + '#' + h.x.id && now - flastTap.t < 450) { frestore(h.st, flastTap.s); flastTap = null; foldDo(h, function () { fall(h.st, h.x); }); return; }
+  var sn = fsnap(h.st);
+  foldDo(h, function () { fopen(h.st, h.x); });
+  flastTap = { k: h.st.key + '#' + h.x.id, t: Date.now(), s: sn };
+});
+$('codepre').addEventListener('pointercancel', fendHold);
+$('codepre').addEventListener('click', function (e) {
+  var b = e.target.closest && e.target.closest('.goto'); if (!b) return;
+  var pre = $('codepre'), row = pre.querySelector('.ln[data-k="' + b.dataset.go + '"]'); if (!row) return;
+  pre.scrollTop = row.offsetTop; updateBar();
+  row.classList.remove('flash'); void row.offsetWidth; row.classList.add('flash'); setTimeout(function () { row.classList.remove('flash'); }, 1500);
+});
+$('codepre').addEventListener('click', function (e) {
+  var h = diaOf(e); if (!h) return;
+  if (fptype === 'touch') { e.preventDefault(); return; }
+  if (e.detail === 0) return;
+  if (e.detail === 1) { fbefore = { k: h.st.key, s: fsnap(h.st) }; foldDo(h, function () { fopen(h.st, h.x); }); }
+});
+$('codepre').addEventListener('contextmenu', function (e) {
+  var h = diaOf(e); if (!h) return;
+  e.preventDefault();
+  if (fptype === 'touch') return;
+  foldDo(h, function () { fclose(h.st, h.x); });
+});
+$('codepre').addEventListener('keydown', function (e) {
+  var h = diaOf(e); if (!h || e.key !== 'Enter') return;
+  e.preventDefault(); foldDo(h, function () { if (e.shiftKey) fclose(h.st, h.x); else fopen(h.st, h.x); });
+});
+$('codepre').addEventListener('change', function (e) {
+  var sel = e.target.closest && e.target.closest('select.pop'); if (!sel) return;
+  var st = FST[sel.dataset.fk]; if (!st) return;
+  st.cap = +sel.value; var pre = $('codepre'), top = pre.scrollTop; renderCode(true); pre.scrollTop = top; updateBar(true);
+});
+$('codepre').addEventListener('mousedown', function (e) { if (e.detail > 1) e.preventDefault(); });
+function wordAt(x, y) {
+  var node = null, off = 0;
+  if (document.caretPositionFromPoint) { var c = document.caretPositionFromPoint(x, y); if (c) { node = c.offsetNode; off = c.offset; } }
+  else if (document.caretRangeFromPoint) { var r = document.caretRangeFromPoint(x, y); if (r) { node = r.startContainer; off = r.startOffset; } }
+  if (!node || node.nodeType !== 3) return null;
+  if (node.parentElement && (node.parentElement.tagName === 'I' || node.parentElement.closest('.fx, .g'))) return null;
+  var ln = node.parentElement && node.parentElement.closest('.ln'); if (!ln || ln.dataset.k === undefined) return null;
+  var txt = node.data, a = off, b = off;
+  while (a > 0 && /\w/.test(txt[a - 1])) a--;
+  while (b < txt.length && /\w/.test(txt[b])) b++;
+  if (a === b) return null;
+  var rg = document.createRange(); rg.setStartAfter(ln.querySelector('i')); rg.setEnd(node, a);
+  return { word: txt.slice(a, b), k: +ln.dataset.k, col: rg.toString().length, len: b - a };
+}
+$('codepre').addEventListener('dblclick', function (e) {
+  var dh = diaOf(e);
+  if (dh) {
+    if (fptype === 'touch') return;
+    if (fbefore && fbefore.k === dh.st.key) frestore(dh.st, fbefore.s);
+    foldDo(dh, function () { fall(dh.st, dh.x); }); fbefore = null; e.preventDefault(); return;
+  }
+  if (e.target.closest('.fx, .g, .goto')) return;
+  var say = function (m) { $('cmsg').textContent = m; cv.cmsg = m; };
+  var hit = wordAt(e.clientX, e.clientY);
+  var sel = window.getSelection(); if (sel) sel.removeAllRanges();
+  if (!hit) { say(''); goBack(); return; }
+  var w = hit.word, defs = DEFS[w] || [];
+  var d = defs.filter(function (q) { return q.f === cv.file && q.line - 1 !== hit.k; })[0] || defs.filter(function (q) { return q.f !== cv.file; })[0];
+  if (!d) {
+    var own = defs.filter(function (q) { return q.f === cv.file && q.line - 1 === hit.k; })[0];
+    if (own) { if (cv.stack.length) { say(''); goBack(); } else say('"' + w + '" is defined here.'); return; }
+    say('');
+    var pre0 = $('codepre'), top0 = pre0.scrollTop, S = cv.sym;
+    if (S && S.file === cv.file && S.word === w) {
+      var q0 = -1; S.list.forEach(function (m, q) { if (q0 < 0 && m.k === hit.k && m.col === hit.col) q0 = q; });
+      if (q0 >= 0) S.idx = q0; else S.idx = (S.idx + 1) % Math.max(1, S.list.length);
+      renderCode(true); pre0.scrollTop = top0; return;
+    }
+    symStart(hit); renderCode(true); pre0.scrollTop = top0; return;
+  }
+  say('');
+  cv.stack.push({ file: cv.file, hits: cv.hits.slice(), top: $('codepre').scrollTop });
+  cv.file = d.f; cv.hits = [d.line]; cv.sym = null;
+  renderCode();
+});
+$('codeview').addEventListener('dblclick', function (e) { if (e.target === $('codeview')) { cv.cmsg = ''; goBack(); } });
+
+/* ---------- keys and tips ---------- */
+document.addEventListener('keydown', function (e) {
+  if (e.target && /^(INPUT|SELECT|TEXTAREA)$/.test(e.target.tagName)) return;
+  if (e.altKey || e.ctrlKey || e.metaKey) return;
+  var code = !$('codeview').hidden;
+  if (e.key === 'ArrowRight' && !code) { e.preventDefault(); if (timer) stopPlay(); else next(); }
+  else if (e.key === 'ArrowLeft' && !code) { e.preventDefault(); if (timer) stopPlay(); else prev(); }
+  else if (e.key === ' ' && !(e.target && e.target.tagName === 'BUTTON')) { e.preventDefault(); timer ? stopPlay() : startPlay(); }
+  else if (e.key === 'Escape') { if (code && !symClear()) closeCode(); }
+  else if (code && (e.key === 'n' || e.key === 'N') && cv.sym) { e.preventDefault(); symStep(e.key === 'n' ? 1 : -1); }
+  else if (code && e.key === 'Backspace') { e.preventDefault(); goBack(); }
+});
+var tipEl = $('ftip'), tipTimer = 0, tipOn = true;
+try { tipOn = localStorage.getItem('consoleStepperTips') !== '0'; } catch (e) {}
+['tipOn', 'tipOn2'].forEach(function (id) {
+  $(id).checked = tipOn;
+  $(id).addEventListener('change', function () { tipOn = this.checked; $('tipOn').checked = $('tipOn2').checked = tipOn; hideTip(); try { localStorage.setItem('consoleStepperTips', tipOn ? '1' : '0'); } catch (e) {} });
+});
+function showTip(el, now) {
+  clearTimeout(tipTimer);
+  if (!tipOn) return;
+  if (!now) { tipTimer = setTimeout(function () { showTip(el, true); }, 700); return; }
+  var t = el.getAttribute('data-tip'); if (!t) return;
+  tipEl.textContent = t; tipEl.hidden = false;
+  var r = el.getBoundingClientRect(), w = tipEl.offsetWidth, h = tipEl.offsetHeight;
+  var x = Math.min(Math.max(8, r.left), window.innerWidth - w - 8), y = r.bottom + 6;
+  if (y + h > window.innerHeight - 8) y = Math.max(8, r.top - h - 6);
+  tipEl.style.left = x + 'px'; tipEl.style.top = y + 'px';
+}
+function hideTip() { clearTimeout(tipTimer); tipEl.hidden = true; }
+var TIPS = {
+  'b-reset': 'Go back to the first step.', 'b-prev': 'Go back one step.', 'b-next': 'Go forward one step.',
+  'b-play': 'Step automatically at the speed chosen beside it. Press again to pause.',
+  'b-code': 'Show the whole Tcl source file for the step you are on, with folding.',
+  'b-back': 'Go back to where you were before the last jump, or return to the walkthrough.'
+};
+Object.keys(TIPS).forEach(function (id) { var b = $(id); if (b) b.setAttribute('data-tip', TIPS[id]); });
+function tipOf(e) {
+  var el = e.target.closest && e.target.closest('[data-tip],[title]');
+  if (el && !el.hasAttribute('data-tip')) { el.setAttribute('data-tip', el.getAttribute('title')); el.removeAttribute('title'); }
+  return el;
+}
+document.addEventListener('pointerover', function (e) { if (e.pointerType === 'touch') return; var el = tipOf(e); if (el) showTip(el); });
+document.addEventListener('pointerout', function (e) { if (e.target.closest && e.target.closest('[data-tip]')) hideTip(); });
+document.addEventListener('pointerdown', hideTip);
+document.addEventListener('focusin', function (e) { var el = e.target.closest && e.target.closest('[data-tip]'); if (el && el.matches(':focus-visible')) showTip(el, true); });
+document.addEventListener('focusout', hideTip);
+window.addEventListener('scroll', hideTip, { passive: true });
+
+/* ---------- self-check ---------- */
+function selfCheck() {
+  var errs = bad.slice(), n = 0;
+  var hexs = function (a) { return a.map(hex2).join('').toLowerCase(); };
+  /* values measured by running consolecmd.impl under Tcl/Tk 8.6.14 (see the notes) */
+  if (hexs(encodeStr('hello \u21a9 there', 'utf-8')) !== '68656c6c6f20e286a9207468657265') errs.push('utf-8 bytes differ from the measured ones');
+  if (hexs(encodeStr('\u20ac', 'iso8859-15')) !== 'a4') errs.push('iso8859-15 byte differs');
+  if (decodeVia('cur', 'iso8859-15', [0xa4]) !== '\u20ac') errs.push('cur decode');
+  if (decodeVia('none', 'iso8859-15', [0xa4]) !== '\u00a4') errs.push('none decode of A4 should leave U+00A4');
+  if (decodeVia('none', 'utf-8', encodeStr('\u21a9', 'utf-8')) !== '\u00e2\u0086\u00a9') errs.push('none decode');
+  ORDER.forEach(function (f) {
+    var an = analyze(f); if (!an.ok) errs.push('unbalanced braces in ' + f);
+    an.units.forEach(function (u) { var st = foldState(f, u); st.nodes.forEach(function (x) { if (x.e < x.s) errs.push('bad fold node in ' + f); }); fopen(st, st.nodes[0]); fall(st, st.nodes[0]); fall(st, st.nodes[0]); });
+    FST = {}; AN = {}; BARF = {};
+  });
+  if (analyze('impl').units.length < 8) errs.push('too few fold units in impl: ' + analyze('impl').units.length);
+  var wproc = analyze('impl').units.filter(function (u) { return /proc write /.test(LINES.impl[u.hdr]); })[0];
+  if (!wproc || !wproc.inner.length) errs.push('proc write has no inner blocks');
+  var sv = { file: cv.file, hits: cv.hits };
+  ORDER.forEach(function (f) { cv.file = f; cv.hits = []; try { renderCode(true); } catch (e) { errs.push('code view ' + f + ': ' + e.message); } });
+  cv.file = sv.file; cv.hits = sv.hits; FST = {}; AN = {}; BARF = {}; focusSig = '';
+  var saveSi = si, saveCur = cur, saveDec = O.dec;
+  ['cur', 'none'].forEach(function (d) {
+    O.dec = d;
+    for (var i = 0; i < SC.length; i++) {
+      si = i; cur = 0; build();
+      for (var k = 0; k < cs.steps.length; k++) {
+        cur = k; n++;
+        try { render(); } catch (e) { errs.push('render ' + i + '/' + k + '/' + d + ': ' + e.message); }
+        var s = cs.steps[k];
+        if (!s.title || !s.text || !s.text.length) errs.push('empty step ' + i + '/' + k);
+        if (s.code) s.code.forEach(function (r) { if (r.e < r.s || r.e > LINES[r.f].length) errs.push('bad range ' + i + '/' + k); });
+      }
+      if (cs.expect) {
+        var s2 = stateAt(cs.steps.length - 1), last = s2.con.lines.filter(function (l) { return l[0] && l[0][1] === '' && l[0][0] !== ''; }).pop();
+        if (!last || last[0][0] !== cs.expect.out) errs.push('console text for scenario ' + i + '/' + d + ' is ' + (last && last[0][0]) + ' not ' + cs.expect.out);
+      }
+    }
+  });
+  si = saveSi; cur = saveCur; O.dec = saveDec; build(); render();
+  var msg = errs.length ? 'self-check FAILED: ' + errs.join('; ') : 'self-check passed: ' + n + ' step renderings, anchors and measured values agree';
+  $('selfcheck').textContent = msg;
+  window.__selfcheck = { ok: !errs.length, errs: errs, n: n };
+  return errs;
+}
+
+buildDefs();
+build(); render();
+if (/[?&]check=1/.test(location.search)) selfCheck(); else { var e0 = bad.slice(); if (e0.length && window.console) console.warn('console stepper: unresolved anchors', e0); }
+})();
+</script>
+</body>
+</html>
