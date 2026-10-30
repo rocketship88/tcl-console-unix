@@ -222,7 +222,7 @@ pre.code mark.sym.cur { background:var(--pc-b); color:#111; box-shadow:0 0 0 2px
 <main>
   <header class="top">
     <div class="topl">
-      <p class="ver mono">Version 1.6 &middot; Oct 29, 2026</p>
+      <p class="ver mono">Version 1.7 &middot; Oct 29, 2026</p>
       <h1>Tk Console on Unix: <span>Channel Transform Stepper</span></h1>
       <p class="lede">TIP 561 adds the <code>console</code> command to Unix. Follow a <code>puts</code> containing a <code>\u21a9</code> escape from the script, through the channel's encoding and the transform's <code>write</code> method, to the text widget in the console window. Pick a script below: the first shows how <code>tclIndex</code> brings the command into existence; the others show output going to the terminal, then to the console, and back.</p>
     </div>
@@ -328,7 +328,7 @@ var vis = function (s) { return esc(s).replace(/[\u0080-\u009f]/g, function (m) 
 
 /* ---------- embedded sources ---------- */
 var FILES = {
-  tclIndex: { label: 'tclIndex', full: 'tk/library/tclIndex', note: 'The header comment is the standard auto_mkindex one; the last line is the one line TIP 561 adds.' },
+  tclIndex: { label: 'tclIndex', full: 'tk/library/tclIndex', note: 'Tk 8.6.14\u2019s generated tclIndex, with the one line TIP 561 adds at the end of the file.' },
   stub:     { label: 'consolecmd.tcl', full: 'tk/library/consolecmd.tcl', note: 'New file in TIP 561: a stub small enough for auto_mkindex to source safely.' },
   impl:     { label: 'consolecmd.impl', full: 'tk/library/consolecmd.impl', note: 'New file in TIP 561: the real implementation, loaded on the first call.' },
   tkout:    { label: 'console.tcl (excerpt)', full: 'tk/library/console.tcl', note: 'Tk\u2019s own console script, not changed by the TIP. Only ConsoleOutput is shown here (from Tk 8.6.14).' }
