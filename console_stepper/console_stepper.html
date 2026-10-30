@@ -222,12 +222,12 @@ pre.code mark.sym.cur { background:var(--pc-b); color:#111; box-shadow:0 0 0 2px
 <main>
   <header class="top">
     <div class="topl">
-      <p class="ver mono">Version 1.5 &middot; Oct 29, 2026</p>
+      <p class="ver mono">Version 1.6 &middot; Oct 29, 2026</p>
       <h1>Tk Console on Unix: <span>Channel Transform Stepper</span></h1>
       <p class="lede">TIP 561 adds the <code>console</code> command to Unix. Follow a <code>puts</code> containing a <code>\u21a9</code> escape from the script, through the channel's encoding and the transform's <code>write</code> method, to the text widget in the console window. Pick a script below: the first shows how <code>tclIndex</code> brings the command into existence; the others show output going to the terminal, then to the console, and back.</p>
     </div>
     <div class="keycol"><div class="keys" aria-label="keyboard and mouse shortcuts"><b>Shortcuts</b>
-      <div><kbd>&rarr;</kbd> next step <kbd>&larr;</kbd> back</div>
+      <div><kbd>&rarr;</kbd> next step <kbd>&larr;</kbd> back (the code view follows the step)</div>
       <div><kbd>Space</kbd> start / pause auto-play</div>
       <div><kbd>Esc</kbd> clear the highlighted name, or close the code view</div>
       <div>code view: fold squares &mdash; click opens a level, right-click closes one, double-click opens or closes all</div>
@@ -1070,7 +1070,12 @@ function render() {
   $('decBox').style.display = cs.hasDec ? '' : 'none';
   [].forEach.call($('scenSeg').children, function (b, i) { b.setAttribute('aria-pressed', i === si ? 'true' : 'false'); });
   [].forEach.call($('decSeg').children, function (b) { b.setAttribute('aria-pressed', b.dataset.v === O.dec ? 'true' : 'false'); });
-  if (!$('codeview').hidden) renderCode(true);
+  if (!$('codeview').hidden) {   /* the code view follows the steps: jump to this step's code */
+    var cst = cs.steps[cur]; cv.stack = []; cv.sym = null; focusSig = '';
+    if (cst.code && cst.code[0]) cv.file = cst.code[0].f;
+    cv.hits = stepHits(cv.file); cv.cmsg = cst.code ? '' : (cst.alt ? 'This step is not in the current code: the page shows a simulated version of it.' : 'No code from these files runs in this step (' + (cst.nocode || 'Tcl core').replace(/<[^>]+>/g, '') + ')');
+    renderCode();
+  }
 }
 function setScenario(i) { si = i; cur = 0; build(); render(); }
 
@@ -1577,8 +1582,8 @@ document.addEventListener('keydown', function (e) {
   if (e.target && /^(INPUT|SELECT|TEXTAREA)$/.test(e.target.tagName)) return;
   if (e.altKey || e.ctrlKey || e.metaKey) return;
   var code = !$('codeview').hidden;
-  if (e.key === 'ArrowRight' && !code) { e.preventDefault(); if (timer) stopPlay(); else next(); }
-  else if (e.key === 'ArrowLeft' && !code) { e.preventDefault(); if (timer) stopPlay(); else prev(); }
+  if (e.key === 'ArrowRight' && !(code && e.target && e.target.closest && e.target.closest('#codepre') && e.target !== $('codepre'))) { e.preventDefault(); if (timer) stopPlay(); else next(); }
+  else if (e.key === 'ArrowLeft' && !(code && e.target && e.target.closest && e.target.closest('#codepre') && e.target !== $('codepre'))) { e.preventDefault(); if (timer) stopPlay(); else prev(); }
   else if (e.key === ' ' && !(e.target && e.target.tagName === 'BUTTON')) { e.preventDefault(); timer ? stopPlay() : startPlay(); }
   else if (e.key === 'Escape') { if (code && !symClear()) closeCode(); }
   else if (code && (e.key === 'n' || e.key === 'N') && cv.sym) { e.preventDefault(); symStep(e.key === 'n' ? 1 : -1); }
